@@ -28,6 +28,8 @@ class EmployeeRepository {
     return _db.employeeDao.updateEmployee(employee.copyWith(name: newName));
   }
 
-  Future<void> deleteEmployee(int id) =>
-      _db.employeeDao.softDeleteEmployee(id);
+  Future<void> deleteEmployee(int id) async {
+    await _db.salaryRecordDao.deleteActiveRecord(id);
+    await _db.employeeDao.softDeleteEmployee(id);
+  }
 }

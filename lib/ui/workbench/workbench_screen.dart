@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:salary_swift/data/db/entity/employee.dart';
 import 'workbench_viewmodel.dart';
 
 class WorkbenchScreen extends ConsumerStatefulWidget {
@@ -29,20 +30,71 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
   FocusNode _focusNodeFor(int id) =>
       _focusNodes.putIfAbsent(id, () => FocusNode());
 
-  void _onSubmitAmount(int employeeId, List<int> pendingIds, int currentIndex) {
+  Future<void> _onSubmitAmount(
+    int employeeId,
+    List<int> pendingIds,
+    int currentIndex,
+  ) async {
     final text = _controllerFor(employeeId).text.trim();
     final amount = double.tryParse(text);
     if (amount != null && amount > 0) {
-      ref.read(workbenchViewModelProvider.notifier).saveAmount(employeeId, amount);
-      _controllerFor(employeeId).clear(); // 清空，准备下次（如果需要）
+      await ref
+          .read(workbenchViewModelProvider.notifier)
+          .saveAmount(employeeId, amount);
+      _controllerFor(employeeId).clear();
     }
-    
+
     final nextIndex = currentIndex + 1;
     if (nextIndex < pendingIds.length) {
       _focusNodeFor(pendingIds[nextIndex]).requestFocus();
     } else {
       FocusScope.of(context).unfocus();
     }
+  }
+
+  Future<void> _showEditAmountDialog(Employee employee, double initialAmount) async {
+    final controller = TextEditingController(text: initialAmount.toStringAsFixed(2));
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('修改 ${employee.name} 的金额'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+          ],
+          decoration: const InputDecoration(
+            prefixText: '¥ ',
+            hintText: '0.00',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final amount = double.tryParse(controller.text.trim());
+              if (amount == null || amount <= 0) {
+                return;
+              }
+
+              await ref
+                  .read(workbenchViewModelProvider.notifier)
+                  .saveAmount(employee.id, amount);
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirmSettle() async {
@@ -125,6 +177,7 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
                         return _EnteredTile(
                           name: emp.name,
                           amount: _fmt.format(amount),
+                          onEdit: () => _showEditAmountDialog(emp, amount),
                           onUndo: () => ref.read(workbenchViewModelProvider.notifier).undoAmount(emp.id),
                         );
                       },
@@ -261,9 +314,15 @@ class _PendingInputTile extends StatelessWidget {
 }
 
 class _EnteredTile extends StatelessWidget {
-  const _EnteredTile({required this.name, required this.amount, required this.onUndo});
+  const _EnteredTile({
+    required this.name,
+    required this.amount,
+    required this.onEdit,
+    required this.onUndo,
+  });
   final String name;
   final String amount;
+  final VoidCallback onEdit;
   final VoidCallback onUndo;
 
   @override
@@ -277,6 +336,7 @@ class _EnteredTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('¥ $amount', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
+            IconButton(onPressed: onEdit, icon: const Icon(Icons.edit_outlined, size: 20, color: Colors.grey)),
             IconButton(onPressed: onUndo, icon: const Icon(Icons.remove_circle_outline, size: 20, color: Colors.grey)),
           ],
         ),

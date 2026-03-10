@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'employees_viewmodel.dart';
 import '../../data/db/entity/employee.dart';
 
@@ -38,8 +39,13 @@ class EmployeesScreen extends ConsumerWidget {
                     onDelete: () async {
                       final confirm = await _confirmDelete(context, emp.name);
                       if (confirm == true) {
-                        ref.read(employeesViewModelProvider.notifier).deleteEmployee(emp.id);
+                        await ref
+                            .read(employeesViewModelProvider.notifier)
+                            .deleteEmployee(emp.id);
+                        return true;
                       }
+
+                      return false;
                     },
                   );
                 },
@@ -147,26 +153,39 @@ class _EmployeeCard extends StatelessWidget {
   const _EmployeeCard({required this.employee, required this.onEdit, required this.onDelete});
   final Employee employee;
   final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final Future<bool> Function() onDelete;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+    return Dismissible(
+      key: ValueKey(employee.id),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => onDelete(),
+      background: Container(
+        decoration: BoxDecoration(
+          color: Colors.red.shade400,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
-      child: ListTile(
-        onTap: onEdit,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: _Avatar(name: employee.name),
-        title: Text(employee.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-        subtitle: Text('入职于: ${DateFormat('yyyy-MM-dd').format(DateTime.fromMillisecondsSinceEpoch(employee.createdAt))}', 
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-        trailing: IconButton(
-          icon: Icon(Icons.delete_outline, color: Colors.red.shade300, size: 22),
-          onPressed: onDelete,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: ListTile(
+          onTap: onEdit,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: _Avatar(name: employee.name),
+          title: Text(employee.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          subtitle: Text(
+            '入职于: ${DateFormat('yyyy-MM-dd').format(DateTime.fromMillisecondsSinceEpoch(employee.createdAt))}',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          ),
+          trailing: Icon(Icons.edit_outlined, color: Colors.grey.shade400, size: 20),
         ),
       ),
     );
@@ -244,5 +263,3 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-
-import 'package:intl/intl.dart';

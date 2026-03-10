@@ -15,6 +15,9 @@ class SalaryRepository {
   Stream<List<BatchDetailItem>> watchActiveRecords() =>
       _db.salaryRecordDao.watchActiveRecords();
 
+  Stream<List<BatchSummary>> watchBatchSummaries() =>
+      _db.salaryRecordDao.watchBatchSummaries();
+
   Future<Set<int>> getActiveEmployeeIds() =>
       _db.salaryRecordDao.getActiveEmployeeIds();
 

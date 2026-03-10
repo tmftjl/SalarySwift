@@ -1,10 +1,10 @@
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:salary_swift/data/db/dao/salary_record_dao.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -33,13 +33,8 @@ class PdfExporter {
       String batchKey, List<BatchDetailItem> items) async {
     final pdf = pw.Document();
     final fmt = NumberFormat('#,##0.00', 'zh_CN');
-
-    // 加载支持中文的字体
-    final fontData = await rootBundle.load('assets/fonts/NotoSansSC-Regular.ttf');
-    final font = pw.Font.ttf(fontData);
-    final boldFontData =
-        await rootBundle.load('assets/fonts/NotoSansSC-Bold.ttf');
-    final boldFont = pw.Font.ttf(boldFontData);
+    final regularFont = await _loadFont('assets/fonts/NotoSansSC-Regular.otf');
+    final boldFont = await _loadFont('assets/fonts/NotoSansSC-Bold.otf');
 
     final title = _formatBatchKey(batchKey);
     final totalAmount = items.fold(0.0, (s, i) => s + i.amount);
@@ -79,8 +74,8 @@ class PdfExporter {
                   // 数据行
                   ...items.map(
                     (item) => pw.TableRow(children: [
-                      _cell(item.employeeName, font),
-                      _cell('¥ ${fmt.format(item.amount)}', font,
+                      _cell(item.employeeName, regularFont),
+                      _cell('¥ ${fmt.format(item.amount)}', regularFont,
                           align: pw.TextAlign.right),
                     ]),
                   ),
@@ -100,7 +95,7 @@ class PdfExporter {
               pw.SizedBox(height: 24),
               pw.Text(
                 '共 ${items.length} 人    生成时间：${_nowString()}',
-                style: pw.TextStyle(font: font, fontSize: 10,
+                style: pw.TextStyle(font: regularFont, fontSize: 10,
                     color: PdfColors.grey600),
               ),
             ],
@@ -141,4 +136,9 @@ class PdfExporter {
   }
 
   static String _pad(int n) => n.toString().padLeft(2, '0');
+
+  static Future<pw.Font> _loadFont(String assetPath) async {
+    final data = await rootBundle.load(assetPath);
+    return pw.Font.ttf(data);
+  }
 }

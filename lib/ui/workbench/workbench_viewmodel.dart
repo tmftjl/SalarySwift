@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:salary_swift/data/db/dao/salary_record_dao.dart';
 import 'package:salary_swift/data/db/entity/employee.dart';
 import 'package:salary_swift/data/repository/employee_repository.dart';
 import 'package:salary_swift/data/repository/salary_repository.dart';
@@ -38,33 +41,52 @@ class WorkbenchState {
 class WorkbenchViewModel extends StateNotifier<WorkbenchState> {
   final EmployeeRepository _employeeRepo;
   final SalaryRepository _salaryRepo;
+  StreamSubscription<List<Employee>>? _employeeSubscription;
+  StreamSubscription<List<BatchDetailItem>>? _activeRecordSubscription;
+  List<Employee> _allEmployees = const [];
+  List<BatchDetailItem> _activeRecords = const [];
+  bool _hasEmployeeSnapshot = false;
+  bool _hasActiveRecordSnapshot = false;
 
   WorkbenchViewModel(this._employeeRepo, this._salaryRepo)
-      : super(const WorkbenchState()) {
+      : super(const WorkbenchState(isLoading: true)) {
     _init();
   }
 
   void _init() {
-    // 监听在职员工变化
-    _employeeRepo.watchActiveEmployees().listen((allEmployees) async {
-      final activeRecords = await _salaryRepo.watchActiveRecords().first;
-      final activeIds = activeRecords.map((r) => r.employeeId).toSet();
-      
-      final amounts = <int, double>{};
-      for (final record in activeRecords) {
-        amounts[record.employeeId] = record.amount;
-      }
+    _employeeSubscription = _employeeRepo.watchActiveEmployees().listen((allEmployees) {
+      _allEmployees = allEmployees;
+      _hasEmployeeSnapshot = true;
+      _rebuildState();
+    });
 
-      state = state.copyWith(
-        pendingEmployees: allEmployees.where((e) => !activeIds.contains(e.id)).toList(),
-        enteredEmployees: allEmployees.where((e) => activeIds.contains(e.id)).toList(),
-        enteredAmounts: amounts,
-      );
+    _activeRecordSubscription = _salaryRepo.watchActiveRecords().listen((activeRecords) {
+      _activeRecords = activeRecords;
+      _hasActiveRecordSnapshot = true;
+      _rebuildState();
     });
   }
 
-  Future<void> _refresh() async {
-    // 触发上面的监听器，不需要额外逻辑
+  void _rebuildState() {
+    if (!_hasEmployeeSnapshot || !_hasActiveRecordSnapshot) {
+      return;
+    }
+
+    final activeIds = _activeRecords.map((record) => record.employeeId).toSet();
+    final amounts = <int, double>{
+      for (final record in _activeRecords) record.employeeId: record.amount,
+    };
+    final enteredEmployees =
+        _allEmployees.where((employee) => activeIds.contains(employee.id)).toList();
+    final pendingEmployees =
+        _allEmployees.where((employee) => !activeIds.contains(employee.id)).toList();
+
+    state = state.copyWith(
+      pendingEmployees: pendingEmployees,
+      enteredEmployees: enteredEmployees,
+      enteredAmounts: amounts,
+      isLoading: false,
+    );
   }
 
   /// 录入或更新某员工工资
@@ -85,6 +107,13 @@ class WorkbenchViewModel extends StateNotifier<WorkbenchState> {
   /// 一键结算
   Future<void> settle() async {
     await _salaryRepo.settleCurrentMonth();
+  }
+
+  @override
+  void dispose() {
+    _employeeSubscription?.cancel();
+    _activeRecordSubscription?.cancel();
+    super.dispose();
   }
 }
 

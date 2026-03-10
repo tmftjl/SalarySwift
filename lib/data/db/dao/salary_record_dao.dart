@@ -43,7 +43,8 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
     final query = select(salaryRecords).join([
       innerJoin(employees, employees.id.equalsExp(salaryRecords.employeeId)),
     ])
-      ..where(salaryRecords.status.equals('active'));
+      ..where(salaryRecords.status.equals('active'))
+      ..orderBy([OrderingTerm.asc(employees.createdAt)]);
 
     return query.watch().map((rows) => rows.map((row) {
           return BatchDetailItem(
@@ -63,8 +64,37 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// 插入或更新 active 记录
-  Future<int> upsertActiveRecord(SalaryRecordsCompanion entry) {
-    return into(salaryRecords).insertOnConflictUpdate(entry);
+  Future<int> upsertActiveRecord(SalaryRecordsCompanion entry) async {
+    final employeeId = entry.employeeId.value;
+
+    return transaction(() async {
+      final existing = await (select(salaryRecords)
+            ..where((r) =>
+                r.employeeId.equals(employeeId) & r.status.equals('active'))
+            ..orderBy([(r) => OrderingTerm.desc(r.createdAt)]))
+          .get();
+
+      if (existing.isEmpty) {
+        return into(salaryRecords).insert(entry);
+      }
+
+      final keep = existing.first;
+      await (update(salaryRecords)..where((r) => r.id.equals(keep.id))).write(
+        SalaryRecordsCompanion(
+          amount: entry.amount,
+          createdAt: entry.createdAt,
+          status: const Value('active'),
+          batchKey: const Value(null),
+        ),
+      );
+
+      if (existing.length > 1) {
+        final duplicateIds = existing.skip(1).map((row) => row.id).toList();
+        await (delete(salaryRecords)..where((r) => r.id.isIn(duplicateIds))).go();
+      }
+
+      return keep.id;
+    });
   }
 
   /// 删除某员工的 active 记录（用于撤销录入）
@@ -110,6 +140,32 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
         employeeCount: row.read<int>('employee_count'),
       );
     }).toList();
+  }
+
+  /// 监听历史批次列表（按 batch_key 倒序）
+  Stream<List<BatchSummary>> watchBatchSummaries() {
+    final query = customSelect(
+      '''
+      SELECT batch_key,
+             SUM(amount)  AS total_amount,
+             COUNT(*)     AS employee_count
+      FROM salary_records
+      WHERE status = 'settled'
+      GROUP BY batch_key
+      ORDER BY batch_key DESC
+      ''',
+      readsFrom: {salaryRecords},
+    );
+
+    return query.watch().map((rows) {
+      return rows.map((row) {
+        return BatchSummary(
+          batchKey: row.read<String>('batch_key'),
+          totalAmount: row.read<double>('total_amount'),
+          employeeCount: row.read<int>('employee_count'),
+        );
+      }).toList();
+    });
   }
 
   /// 获取某批次的明细列表

@@ -1,12 +1,9 @@
 # 字体说明
 
-PDF 导出功能需要支持中文的字体文件。
+当前仓库已包含 PDF 导出所需中文字体：
+- NotoSansSC-Regular.otf
+- NotoSansSC-Bold.otf
 
-请将以下字体文件放入本目录：
-- NotoSansSC-Regular.ttf
-- NotoSansSC-Bold.ttf
-
-下载地址：https://fonts.google.com/noto/specimen/Noto+Sans+SC
-（点击 "Download family" 即可获得全系列字体）
-
-放入后在 pubspec.yaml 的 flutter.assets 中已自动声明。
+说明：
+- `pubspec.yaml` 已声明 `assets/fonts/` 目录，这两个字体会随 App 一起打包。
+- PDF 导出固定读取这两个字体文件，不再做系统字体或内置字体回退。
