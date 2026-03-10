@@ -1,0 +1,27 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+
+# Android 本地配置（含本机 SDK 路径，不同机器不同）
+android/local.properties
+android/.gradle/
+android/app/.cxx/
+android/app/src/main/java/io/flutter/plugins/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+
+# 依赖锁文件（见下方说明）
+# pubspec.lock  ← 应用项目建议提交，注释掉这行
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 系统文件
+.DS_Store
+Thumbs.db
