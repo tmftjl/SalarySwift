@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:salary_swift/data/db/entity/employee.dart';
+import 'package:salary_swift/data/db/app_database.dart';
 import 'workbench_viewmodel.dart';
 
 class WorkbenchScreen extends ConsumerStatefulWidget {
@@ -221,7 +221,7 @@ class _TotalHeroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -230,7 +230,7 @@ class _TotalHeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('本月发放总额', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w500)),
+          Text('本月发放总额', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -263,7 +263,7 @@ class _SectionTitle extends StatelessWidget {
             const SizedBox(width: 8),
             Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2D3436))),
             const SizedBox(width: 6),
-            Text('$count', style: TextStyle(fontSize: 14, color: color.withOpacity(0.8), fontWeight: FontWeight.w600)),
+            Text('$count', style: TextStyle(fontSize: 14, color: color.withValues(alpha: 0.8), fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -281,7 +281,7 @@ class _PendingInputTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.withOpacity(0.1))),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.withValues(alpha: 0.1))),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
@@ -301,7 +301,7 @@ class _PendingInputTile extends StatelessWidget {
               prefixText: '¥ ',
               prefixStyle: const TextStyle(fontSize: 14, color: Colors.grey),
               filled: true,
-              fillColor: Colors.grey.withOpacity(0.05),
+              fillColor: Colors.grey.withValues(alpha: 0.05),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -328,7 +328,7 @@ class _EnteredTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.green.withOpacity(0.05))),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.green.withValues(alpha: 0.05))),
       child: ListTile(
         contentPadding: const EdgeInsets.only(left: 16, right: 8),
         title: Text(name, style: const TextStyle(fontWeight: FontWeight.w500)),

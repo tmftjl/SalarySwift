@@ -25,7 +25,7 @@ class SalarySwiftApp extends StatelessWidget {
           surface: const Color(0xFFF8F9FA),
         ),
         scaffoldBackgroundColor: const Color(0xFFF8F9FA),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           color: Colors.white,

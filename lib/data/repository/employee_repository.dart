@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:salary_swift/data/db/app_database.dart';
+import 'package:salary_swift/data/db/database_provider.dart';
 import 'package:salary_swift/data/db/entity/employee.dart';
 
 final employeeRepositoryProvider = Provider((ref) {

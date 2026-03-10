@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:salary_swift/data/db/entity/employee.dart';
+import 'package:salary_swift/data/db/app_database.dart';
 import 'package:salary_swift/data/repository/employee_repository.dart';
 
 final employeesViewModelProvider =

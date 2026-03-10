@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'employees_viewmodel.dart';
-import '../../data/db/entity/employee.dart';
+import '../../data/db/app_database.dart';
 
 class EmployeesScreen extends ConsumerWidget {
   const EmployeesScreen({super.key});
@@ -70,7 +70,7 @@ class EmployeesScreen extends ConsumerWidget {
               decoration: InputDecoration(
                 hintText: '输入员工姓名',
                 filled: true,
-                fillColor: Colors.grey.withOpacity(0.05),
+                fillColor: Colors.grey.withValues(alpha: 0.05),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 prefixIcon: const Icon(Icons.person_outline),
               ),
@@ -97,7 +97,7 @@ class EmployeesScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _showEditDialog(BuildContext context, WidgetRef ref, Employee employee) async {
+  Future<void> _showEditDialog(BuildContext context, WidgetRef ref,  Employee employee) async {
     final controller = TextEditingController(text: employee.name);
     await showDialog(
       context: context,
@@ -109,7 +109,7 @@ class EmployeesScreen extends ConsumerWidget {
           autofocus: true,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.grey.withOpacity(0.05),
+            fillColor: Colors.grey.withValues(alpha: 0.05),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           ),
         ),
@@ -174,7 +174,7 @@ class _EmployeeCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: ListTile(
           onTap: onEdit,
@@ -206,7 +206,7 @@ class _Avatar extends StatelessWidget {
     return Container(
       width: 48,
       height: 48,
-      decoration: BoxDecoration(color: _getColor().withOpacity(0.1), shape: BoxShape.circle),
+      decoration: BoxDecoration(color: _getColor().withValues(alpha: 0.1), shape: BoxShape.circle),
       alignment: Alignment.center,
       child: Text(
         name.isNotEmpty ? name.substring(0, 1) : '?',
