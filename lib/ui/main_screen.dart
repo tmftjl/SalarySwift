@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'workbench/workbench_screen.dart';
 import 'employees/employees_screen.dart';
+import 'salary_report/salary_report_screen.dart';
 import 'history/history_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   final _pages = const [
     WorkbenchScreen(),
     EmployeesScreen(),
+    SalaryReportScreen(),
     HistoryScreen(),
   ];
 
@@ -41,6 +43,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.group_outlined),
             selectedIcon: Icon(Icons.group),
             label: '员工库',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.table_chart_outlined),
+            selectedIcon: Icon(Icons.table_chart),
+            label: '历史工资',
           ),
           NavigationDestination(
             icon: Icon(Icons.history_outlined),

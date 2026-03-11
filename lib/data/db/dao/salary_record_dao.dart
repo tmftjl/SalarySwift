@@ -5,28 +5,34 @@ import '../entity/salary_record.dart';
 
 part 'salary_record_dao.g.dart';
 
-/// 批次汇总信息（用于历史列表）
-class BatchSummary {
-  final String batchKey;
+/// 月份汇总（用于历史记录列表）
+class MonthSummary {
+  final int year;
+  final int month;
   final double totalAmount;
   final int employeeCount;
 
-  BatchSummary({
-    required this.batchKey,
+  MonthSummary({
+    required this.year,
+    required this.month,
     required this.totalAmount,
     required this.employeeCount,
   });
 }
 
-/// 批次明细条目（用于历史详情 & PDF）
-class BatchDetailItem {
+/// 单条工资明细（含所属年月，跨月报表时使用）
+class SalaryDetailItem {
   final int employeeId;
   final String employeeName;
+  final int year;
+  final int month;
   final double amount;
 
-  BatchDetailItem({
+  SalaryDetailItem({
     required this.employeeId,
     required this.employeeName,
+    required this.year,
+    required this.month,
     required this.amount,
   });
 }
@@ -36,171 +42,137 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
     with _$SalaryRecordDaoMixin {
   SalaryRecordDao(super.db);
 
-  // ── 工作台 ──────────────────────────────────────────────
+  // ── 工作台：按年月读写 ────────────────────────────────
 
-  /// 监听当前所有 active 记录（含员工姓名）
-  Stream<List<BatchDetailItem>> watchActiveRecords() {
-    final query = select(salaryRecords).join([
-      innerJoin(employees, employees.id.equalsExp(salaryRecords.employeeId)),
-    ])
-      ..where(salaryRecords.status.equals('active'))
-      ..orderBy([OrderingTerm.asc(employees.createdAt)]);
-
-    return query.watch().map((rows) => rows.map((row) {
-          return BatchDetailItem(
-            employeeId: row.readTable(employees).id,
-            employeeName: row.readTable(employees).name,
-            amount: row.readTable(salaryRecords).amount,
-          );
-        }).toList());
+  /// 监听某年月的 employeeId -> amount 映射
+  Stream<Map<int, double>> watchAmountsForMonth(int year, int month) {
+    return (select(salaryRecords)
+          ..where((r) => r.year.equals(year) & r.month.equals(month)))
+        .watch()
+        .map((rows) => {for (final r in rows) r.employeeId: r.amount});
   }
 
-  /// 获取当前 active 记录的员工ID集合
-  Future<Set<int>> getActiveEmployeeIds() async {
+  /// 一次性获取某年月的 employeeId -> amount 映射
+  Future<Map<int, double>> getAmountsForMonth(int year, int month) async {
     final rows = await (select(salaryRecords)
-          ..where((r) => r.status.equals('active')))
+          ..where((r) => r.year.equals(year) & r.month.equals(month)))
         .get();
-    return rows.map((r) => r.employeeId).toSet();
+    return {for (final r in rows) r.employeeId: r.amount};
   }
 
-  /// 插入或更新 active 记录
-  Future<int> upsertActiveRecord(SalaryRecordsCompanion entry) async {
-    final employeeId = entry.employeeId.value;
-
-    return transaction(() async {
-      final existing = await (select(salaryRecords)
-            ..where((r) =>
-                r.employeeId.equals(employeeId) & r.status.equals('active'))
-            ..orderBy([(r) => OrderingTerm.desc(r.createdAt)]))
-          .get();
-
-      if (existing.isEmpty) {
-        return into(salaryRecords).insert(entry);
-      }
-
-      final keep = existing.first;
-      await (update(salaryRecords)..where((r) => r.id.equals(keep.id))).write(
-        SalaryRecordsCompanion(
-          amount: entry.amount,
-          createdAt: entry.createdAt,
-          status: const Value('active'),
-          batchKey: const Value(null),
-        ),
-      );
-
-      if (existing.length > 1) {
-        final duplicateIds = existing.skip(1).map((row) => row.id).toList();
-        await (delete(salaryRecords)..where((r) => r.id.isIn(duplicateIds))).go();
-      }
-
-      return keep.id;
-    });
+  /// 插入或覆盖某员工某月工资（依赖唯一约束 employeeId+year+month）
+  Future<void> upsertRecord(
+      int employeeId, int year, int month, double amount) async {
+    await into(salaryRecords).insertOnConflictUpdate(
+      SalaryRecordsCompanion.insert(
+        employeeId: employeeId,
+        year: year,
+        month: month,
+        amount: amount,
+      ),
+    );
   }
 
-  /// 删除某员工的 active 记录（用于撤销录入）
-  Future<int> deleteActiveRecord(int employeeId) {
-    return (delete(salaryRecords)
+  /// 删除某员工某月工资
+  Future<void> deleteRecord(int employeeId, int year, int month) async {
+    await (delete(salaryRecords)
           ..where((r) =>
-              r.employeeId.equals(employeeId) & r.status.equals('active')))
+              r.employeeId.equals(employeeId) &
+              r.year.equals(year) &
+              r.month.equals(month)))
         .go();
   }
 
-  // ── 结算 ──────────────────────────────────────────────
-
-  /// 将所有 active 记录归档（一键结算）
-  Future<void> settleAll(String batchKey) {
-    return (update(salaryRecords)..where((r) => r.status.equals('active')))
-        .write(SalaryRecordsCompanion(
-      status: const Value('settled'),
-      batchKey: Value(batchKey),
-    ));
+  /// 删除某员工的所有工资记录（员工被删除时调用）
+  Future<void> deleteAllByEmployee(int employeeId) async {
+    await (delete(salaryRecords)
+          ..where((r) => r.employeeId.equals(employeeId)))
+        .go();
   }
 
-  // ── 历史记录 ──────────────────────────────────────────
+  // ── 历史记录：按月汇总 ────────────────────────────────
 
-  /// 获取历史批次列表（按 batch_key 倒序）
-  Future<List<BatchSummary>> getBatchSummaries() async {
+  /// 监听所有有数据的年月列表（倒序）
+  Stream<List<MonthSummary>> watchMonthSummaries() {
     final query = customSelect(
       '''
-      SELECT batch_key,
+      SELECT year, month,
              SUM(amount)  AS total_amount,
              COUNT(*)     AS employee_count
       FROM salary_records
-      WHERE status = 'settled'
-      GROUP BY batch_key
-      ORDER BY batch_key DESC
+      GROUP BY year, month
+      ORDER BY year DESC, month DESC
       ''',
       readsFrom: {salaryRecords},
     );
-    final rows = await query.get();
-    return rows.map((row) {
-      return BatchSummary(
-        batchKey: row.read<String>('batch_key'),
-        totalAmount: row.read<double>('total_amount'),
-        employeeCount: row.read<int>('employee_count'),
-      );
-    }).toList();
+    return query.watch().map((rows) => rows
+        .map((r) => MonthSummary(
+              year: r.read<int>('year'),
+              month: r.read<int>('month'),
+              totalAmount: r.read<double>('total_amount'),
+              employeeCount: r.read<int>('employee_count'),
+            ))
+        .toList());
   }
 
-  /// 监听历史批次列表（按 batch_key 倒序）
-  Stream<List<BatchSummary>> watchBatchSummaries() {
+  /// 获取某年月的员工工资明细
+  Future<List<SalaryDetailItem>> getDetailForMonth(int year, int month) async {
     final query = customSelect(
       '''
-      SELECT batch_key,
-             SUM(amount)  AS total_amount,
-             COUNT(*)     AS employee_count
-      FROM salary_records
-      WHERE status = 'settled'
-      GROUP BY batch_key
-      ORDER BY batch_key DESC
+      SELECT e.id AS employee_id, e.name AS employee_name,
+             sr.year, sr.month, sr.amount
+      FROM salary_records sr
+      INNER JOIN employees e ON e.id = sr.employee_id
+      WHERE sr.year = ? AND sr.month = ?
+      ORDER BY e.created_at
       ''',
-      readsFrom: {salaryRecords},
+      variables: [Variable.withInt(year), Variable.withInt(month)],
+      readsFrom: {salaryRecords, employees},
     );
-
-    return query.watch().map((rows) {
-      return rows.map((row) {
-        return BatchSummary(
-          batchKey: row.read<String>('batch_key'),
-          totalAmount: row.read<double>('total_amount'),
-          employeeCount: row.read<int>('employee_count'),
-        );
-      }).toList();
-    });
-  }
-
-  /// 获取某批次的明细列表
-  Future<List<BatchDetailItem>> getBatchDetail(String batchKey) async {
-    final query = select(salaryRecords).join([
-      innerJoin(employees, employees.id.equalsExp(salaryRecords.employeeId)),
-    ])
-      ..where(salaryRecords.batchKey.equals(batchKey));
-
     final rows = await query.get();
-    return rows.map((row) {
-      return BatchDetailItem(
-        employeeId: row.readTable(employees).id,
-        employeeName: row.readTable(employees).name,
-        amount: row.readTable(salaryRecords).amount,
-      );
-    }).toList();
+    return rows
+        .map((r) => SalaryDetailItem(
+              employeeId: r.read<int>('employee_id'),
+              employeeName: r.read<String>('employee_name'),
+              year: year,
+              month: month,
+              amount: r.read<double>('amount'),
+            ))
+        .toList();
   }
 
-  // ── 导入上月 ──────────────────────────────────────────
+  // ── 批次报表：按时间范围查询 ─────────────────────────
 
-  /// 获取最近一个 settled 批次的 batch_key
-  Future<String?> getLastBatchKey() async {
-    final row = await (select(salaryRecords)
-          ..where((r) => r.status.equals('settled'))
-          ..orderBy([(r) => OrderingTerm.desc(r.batchKey)])
-          ..limit(1))
-        .getSingleOrNull();
-    return row?.batchKey;
-  }
+  /// 获取指定起止年月范围内所有工资明细（用于跨月报表导出）
+  Future<List<SalaryDetailItem>> getDetailForRange(
+      int startYear, int startMonth, int endYear, int endMonth) async {
+    final startPeriod = startYear * 100 + startMonth;
+    final endPeriod = endYear * 100 + endMonth;
 
-  /// 获取指定批次的所有记录
-  Future<List<SalaryRecord>> getRecordsByBatch(String batchKey) {
-    return (select(salaryRecords)
-          ..where((r) => r.batchKey.equals(batchKey)))
-        .get();
+    final query = customSelect(
+      '''
+      SELECT e.id AS employee_id, e.name AS employee_name,
+             sr.year, sr.month, sr.amount
+      FROM salary_records sr
+      INNER JOIN employees e ON e.id = sr.employee_id
+      WHERE sr.year * 100 + sr.month BETWEEN ? AND ?
+      ORDER BY sr.year, sr.month, e.created_at
+      ''',
+      variables: [
+        Variable.withInt(startPeriod),
+        Variable.withInt(endPeriod),
+      ],
+      readsFrom: {salaryRecords, employees},
+    );
+    final rows = await query.get();
+    return rows
+        .map((r) => SalaryDetailItem(
+              employeeId: r.read<int>('employee_id'),
+              employeeName: r.read<String>('employee_name'),
+              year: r.read<int>('year'),
+              month: r.read<int>('month'),
+              amount: r.read<double>('amount'),
+            ))
+        .toList();
   }
 }

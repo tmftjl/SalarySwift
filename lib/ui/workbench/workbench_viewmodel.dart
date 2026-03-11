@@ -1,38 +1,40 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:salary_swift/data/db/dao/salary_record_dao.dart';
 import 'package:salary_swift/data/db/app_database.dart';
 import 'package:salary_swift/data/repository/employee_repository.dart';
 import 'package:salary_swift/data/repository/salary_repository.dart';
 
-/// 工作台页面状态
 class WorkbenchState {
-  final List<Employee> pendingEmployees;   // 待录入
-  final List<Employee> enteredEmployees;   // 已录入
-  final Map<int, double> enteredAmounts;   // employeeId -> amount
+  final int selectedYear;
+  final int selectedMonth;
+  final List<Employee> employees;
+  final Map<int, double> savedAmounts; // employeeId -> amount（已存入DB的）
   final bool isLoading;
 
   const WorkbenchState({
-    this.pendingEmployees = const [],
-    this.enteredEmployees = const [],
-    this.enteredAmounts = const {},
+    required this.selectedYear,
+    required this.selectedMonth,
+    this.employees = const [],
+    this.savedAmounts = const {},
     this.isLoading = false,
   });
 
   double get totalAmount =>
-      enteredAmounts.values.fold(0.0, (sum, a) => sum + a);
+      savedAmounts.values.fold(0.0, (sum, a) => sum + a);
 
   WorkbenchState copyWith({
-    List<Employee>? pendingEmployees,
-    List<Employee>? enteredEmployees,
-    Map<int, double>? enteredAmounts,
+    int? selectedYear,
+    int? selectedMonth,
+    List<Employee>? employees,
+    Map<int, double>? savedAmounts,
     bool? isLoading,
   }) {
     return WorkbenchState(
-      pendingEmployees: pendingEmployees ?? this.pendingEmployees,
-      enteredEmployees: enteredEmployees ?? this.enteredEmployees,
-      enteredAmounts: enteredAmounts ?? this.enteredAmounts,
+      selectedYear: selectedYear ?? this.selectedYear,
+      selectedMonth: selectedMonth ?? this.selectedMonth,
+      employees: employees ?? this.employees,
+      savedAmounts: savedAmounts ?? this.savedAmounts,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -41,78 +43,82 @@ class WorkbenchState {
 class WorkbenchViewModel extends StateNotifier<WorkbenchState> {
   final EmployeeRepository _employeeRepo;
   final SalaryRepository _salaryRepo;
+
   StreamSubscription<List<Employee>>? _employeeSubscription;
-  StreamSubscription<List<BatchDetailItem>>? _activeRecordSubscription;
-  List<Employee> _allEmployees = const [];
-  List<BatchDetailItem> _activeRecords = const [];
-  bool _hasEmployeeSnapshot = false;
-  bool _hasActiveRecordSnapshot = false;
+  StreamSubscription<Map<int, double>>? _amountsSubscription;
 
   WorkbenchViewModel(this._employeeRepo, this._salaryRepo)
-      : super(const WorkbenchState(isLoading: true)) {
+      : super(WorkbenchState(
+          selectedYear: DateTime.now().year,
+          selectedMonth: DateTime.now().month,
+          isLoading: true,
+        )) {
     _init();
   }
 
   void _init() {
-    _employeeSubscription = _employeeRepo.watchActiveEmployees().listen((allEmployees) {
-      _allEmployees = allEmployees;
-      _hasEmployeeSnapshot = true;
-      _rebuildState();
-    });
-
-    _activeRecordSubscription = _salaryRepo.watchActiveRecords().listen((activeRecords) {
-      _activeRecords = activeRecords;
-      _hasActiveRecordSnapshot = true;
-      _rebuildState();
+    _employeeSubscription =
+        _employeeRepo.watchActiveEmployees().listen((employees) {
+      state = state.copyWith(employees: employees);
+      if (!state.isLoading) return;
+      _subscribeAmounts(state.selectedYear, state.selectedMonth);
     });
   }
 
-  void _rebuildState() {
-    if (!_hasEmployeeSnapshot || !_hasActiveRecordSnapshot) {
-      return;
-    }
+  void _subscribeAmounts(int year, int month) {
+    _amountsSubscription?.cancel();
+    _amountsSubscription =
+        _salaryRepo.watchAmountsForMonth(year, month).listen((amounts) {
+      state = state.copyWith(savedAmounts: amounts, isLoading: false);
+    });
+  }
 
-    final activeIds = _activeRecords.map((record) => record.employeeId).toSet();
-    final amounts = <int, double>{
-      for (final record in _activeRecords) record.employeeId: record.amount,
-    };
-    final enteredEmployees =
-        _allEmployees.where((employee) => activeIds.contains(employee.id)).toList();
-    final pendingEmployees =
-        _allEmployees.where((employee) => !activeIds.contains(employee.id)).toList();
-
+  /// 切换到指定年月（重新加载对应工资数据）
+  Future<void> changeMonth(int year, int month) async {
     state = state.copyWith(
-      pendingEmployees: pendingEmployees,
-      enteredEmployees: enteredEmployees,
-      enteredAmounts: amounts,
-      isLoading: false,
-    );
+        selectedYear: year, selectedMonth: month, isLoading: true);
+    _subscribeAmounts(year, month);
   }
 
-  /// 录入或更新某员工工资
-  Future<void> saveAmount(int employeeId, double amount) async {
-    await _salaryRepo.saveActiveRecord(employeeId, amount);
+  /// 切换到上一个月
+  Future<void> prevMonth() async {
+    int y = state.selectedYear;
+    int m = state.selectedMonth - 1;
+    if (m < 1) {
+      m = 12;
+      y--;
+    }
+    await changeMonth(y, m);
   }
 
-  /// 撤回某员工的录入（使其回到待录入）
-  Future<void> undoAmount(int employeeId) async {
-    await _salaryRepo.deleteActiveRecord(employeeId);
+  /// 切换到下一个月
+  Future<void> nextMonth() async {
+    int y = state.selectedYear;
+    int m = state.selectedMonth + 1;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+    await changeMonth(y, m);
   }
 
-  /// 导入上月数据
-  Future<void> importLastMonth() async {
-    await _salaryRepo.importLastMonth();
-  }
-
-  /// 一键结算
-  Future<void> settle() async {
-    await _salaryRepo.settleCurrentMonth();
+  /// 批量保存当月工资（amount>0 则 upsert，否则 delete）
+  Future<void> saveAll(Map<int, double> amounts) async {
+    final year = state.selectedYear;
+    final month = state.selectedMonth;
+    for (final entry in amounts.entries) {
+      if (entry.value > 0) {
+        await _salaryRepo.upsertRecord(entry.key, year, month, entry.value);
+      } else {
+        await _salaryRepo.deleteRecord(entry.key, year, month);
+      }
+    }
   }
 
   @override
   void dispose() {
     _employeeSubscription?.cancel();
-    _activeRecordSubscription?.cancel();
+    _amountsSubscription?.cancel();
     super.dispose();
   }
 }
