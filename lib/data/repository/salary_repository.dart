@@ -27,6 +27,21 @@ class SalaryRepository {
           int employeeId, int year, int month, double amount) =>
       _db.salaryRecordDao.upsertRecord(employeeId, year, month, amount);
 
+  /// 批量保存某月工资，事务提交后再统一刷新订阅，避免列表多次抖动重建。
+  Future<void> saveMonthAmounts(
+      int year, int month, Map<int, double> amounts) async {
+    await _db.transaction(() async {
+      for (final entry in amounts.entries) {
+        if (entry.value > 0) {
+          await _db.salaryRecordDao
+              .upsertRecord(entry.key, year, month, entry.value);
+        } else {
+          await _db.salaryRecordDao.deleteRecord(entry.key, year, month);
+        }
+      }
+    });
+  }
+
   /// 删除某员工某月工资
   Future<void> deleteRecord(int employeeId, int year, int month) =>
       _db.salaryRecordDao.deleteRecord(employeeId, year, month);

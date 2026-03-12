@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,10 +17,13 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
   final _controllers = <int, TextEditingController>{};
   final _focusNodes = <int, FocusNode>{};
   final _fmt = NumberFormat('#,##0.00', 'zh_CN');
+  final _draftAmounts = <int, double>{};
 
   // 上次已加载的年月，用于检测切换
   int _lastLoadedYear = 0;
   int _lastLoadedMonth = 0;
+  Map<int, double> _lastSyncedAmounts = const {};
+  List<int> _lastEmployeeIds = const [];
 
   @override
   void dispose() {
@@ -38,56 +42,135 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
   FocusNode _focusNodeFor(int id) =>
       _focusNodes.putIfAbsent(id, () => FocusNode());
 
-  /// 切换月份时重置并重新预填控制器
-  void _resetAndPrefill(WorkbenchState state) {
-    for (final c in _controllers.values) {
-      c.clear();
+  double _parseAmount(String text) => double.tryParse(text.trim()) ?? 0.0;
+
+  bool _sameEmployeeSet(List<Employee> employees) {
+    final ids = employees.map((e) => e.id).toList(growable: false);
+    return listEquals(ids, _lastEmployeeIds);
+  }
+
+  void _syncCachesForEmployees(List<Employee> employees) {
+    final validIds = employees.map((e) => e.id).toSet();
+
+    final removedControllerIds = _controllers.keys
+        .where((id) => !validIds.contains(id))
+        .toList(growable: false);
+    for (final id in removedControllerIds) {
+      _controllers.remove(id)?.dispose();
+      _draftAmounts.remove(id);
     }
-    for (final entry in state.savedAmounts.entries) {
-      final c = _controllerFor(entry.key);
-      c.text = entry.value.toStringAsFixed(2);
+
+    final removedFocusIds = _focusNodes.keys
+        .where((id) => !validIds.contains(id))
+        .toList(growable: false);
+    for (final id in removedFocusIds) {
+      _focusNodes.remove(id)?.dispose();
     }
+
+    _lastEmployeeIds = employees.map((e) => e.id).toList(growable: false);
+  }
+
+  /// 切换月份或外部数据完成同步时，重置并重新预填控制器。
+  void _syncDraftFromState(WorkbenchState state) {
+    _syncCachesForEmployees(state.employees);
+
+    for (final employee in state.employees) {
+      final savedAmount = state.savedAmounts[employee.id] ?? 0.0;
+      final controller = _controllerFor(employee.id);
+      controller.text = savedAmount > 0 ? savedAmount.toStringAsFixed(2) : '';
+      _draftAmounts[employee.id] = savedAmount;
+    }
+
     _lastLoadedYear = state.selectedYear;
     _lastLoadedMonth = state.selectedMonth;
+    _lastSyncedAmounts = Map<int, double>.from(state.savedAmounts);
+  }
+
+  bool _hasPendingChanges(WorkbenchState state) {
+    for (final employee in state.employees) {
+      final saved = state.savedAmounts[employee.id] ?? 0.0;
+      final draft = _draftAmounts[employee.id] ?? saved;
+      if ((saved - draft).abs() > 0.0001) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  double _draftTotal(WorkbenchState state) {
+    var total = 0.0;
+    for (final employee in state.employees) {
+      total += _draftAmounts[employee.id] ??
+          (state.savedAmounts[employee.id] ?? 0.0);
+    }
+    return total;
+  }
+
+  Map<int, double> _collectChangedAmounts(WorkbenchState state) {
+    final changed = <int, double>{};
+    for (final employee in state.employees) {
+      final saved = state.savedAmounts[employee.id] ?? 0.0;
+      final draft = _draftAmounts[employee.id] ?? saved;
+      if ((saved - draft).abs() <= 0.0001) {
+        continue;
+      }
+      changed[employee.id] = draft;
+    }
+    return changed;
   }
 
   Future<void> _saveAll(WorkbenchState state) async {
-    final amounts = <int, double>{};
-    for (final emp in state.employees) {
-      final text = _controllers[emp.id]?.text.trim() ?? '';
-      final amount = double.tryParse(text) ?? 0.0;
-      amounts[emp.id] = amount;
+    final amounts = _collectChangedAmounts(state);
+    if (amounts.isEmpty) {
+      return;
     }
+
     await ref.read(workbenchViewModelProvider.notifier).saveAll(amounts);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('保存成功'), behavior: SnackBarBehavior.floating),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('保存成功'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workbenchViewModelProvider);
-
-    // 检测月份切换或首次加载完成时，重置控制器
-    if (!state.isLoading &&
+    final shouldSyncFromMonthChange =
+        !state.isLoading &&
         (state.selectedYear != _lastLoadedYear ||
-            state.selectedMonth != _lastLoadedMonth)) {
+            state.selectedMonth != _lastLoadedMonth);
+    final shouldSyncFromExternalUpdate =
+        !state.isLoading &&
+        !_hasPendingChanges(state) &&
+        (!mapEquals(state.savedAmounts, _lastSyncedAmounts) ||
+            !_sameEmployeeSet(state.employees));
+
+    if (shouldSyncFromMonthChange || shouldSyncFromExternalUpdate) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _resetAndPrefill(state);
+        if (mounted) {
+          setState(() {
+            _syncDraftFromState(state);
+          });
+        }
       });
     }
+
+    final hasPendingChanges = _hasPendingChanges(state);
+    final totalAmount = _draftTotal(state);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('工作台'),
         actions: [
           TextButton(
-            onPressed: state.isLoading ? null : () => _saveAll(state),
+            onPressed: state.isLoading || state.isSaving || !hasPendingChanges
+                ? null
+                : () => _saveAll(state),
             child: Text(
-              '保存',
+              state.isSaving ? '保存中' : '保存',
               style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold),
@@ -103,8 +186,9 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
                 _MonthSelector(
                   year: state.selectedYear,
                   month: state.selectedMonth,
-                  total: state.totalAmount,
+                  total: totalAmount,
                   fmt: _fmt,
+                  hasPendingChanges: hasPendingChanges,
                   onPrev: () =>
                       ref.read(workbenchViewModelProvider.notifier).prevMonth(),
                   onNext: () =>
@@ -120,15 +204,22 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
                               const SizedBox(height: 12),
                           itemBuilder: (_, i) {
                             final emp = state.employees[i];
-                            final saved = state.savedAmounts[emp.id];
+                            final saved = state.savedAmounts[emp.id] ?? 0.0;
+                            final draft = _draftAmounts[emp.id] ?? saved;
+                            final isDirty = (saved - draft).abs() > 0.0001;
                             return _EmployeeInputTile(
                               employee: emp,
                               controller: _controllerFor(emp.id),
                               focusNode: _focusNodeFor(emp.id),
-                              isSaved: saved != null,
-                              savedLabel: saved != null
-                                  ? '¥ ${_fmt.format(saved)}'
-                                  : null,
+                              isSaved: saved > 0,
+                              isDirty: isDirty,
+                              savedLabel:
+                                  saved > 0 ? '¥ ${_fmt.format(saved)}' : null,
+                              onChanged: (value) {
+                                setState(() {
+                                  _draftAmounts[emp.id] = _parseAmount(value);
+                                });
+                              },
                               onSubmitted: () {
                                 final nextIndex = i + 1;
                                 if (nextIndex < state.employees.length) {
@@ -157,6 +248,7 @@ class _MonthSelector extends StatelessWidget {
     required this.month,
     required this.total,
     required this.fmt,
+    required this.hasPendingChanges,
     required this.onPrev,
     required this.onNext,
   });
@@ -165,6 +257,7 @@ class _MonthSelector extends StatelessWidget {
   final int month;
   final double total;
   final NumberFormat fmt;
+  final bool hasPendingChanges;
   final VoidCallback onPrev;
   final VoidCallback onNext;
 
@@ -224,7 +317,7 @@ class _MonthSelector extends StatelessWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                '本月合计  ¥ ',
+                hasPendingChanges ? '待保存合计  ¥ ' : '本月合计  ¥ ',
                 style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.8), fontSize: 13),
               ),
@@ -238,6 +331,19 @@ class _MonthSelector extends StatelessWidget {
               ),
             ],
           ),
+          if (hasPendingChanges) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '已修改，点击右上角保存后写入数据库',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -252,6 +358,8 @@ class _EmployeeInputTile extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.isSaved,
+    required this.isDirty,
+    required this.onChanged,
     required this.onSubmitted,
     this.savedLabel,
   });
@@ -260,7 +368,9 @@ class _EmployeeInputTile extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool isSaved;
+  final bool isDirty;
   final String? savedLabel;
+  final ValueChanged<String> onChanged;
   final VoidCallback onSubmitted;
 
   @override
@@ -270,9 +380,11 @@ class _EmployeeInputTile extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isSaved
-              ? Colors.green.withValues(alpha: 0.3)
-              : Colors.grey.withValues(alpha: 0.12),
+          color: isDirty
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.35)
+              : isSaved
+                  ? Colors.green.withValues(alpha: 0.3)
+                  : Colors.grey.withValues(alpha: 0.12),
         ),
       ),
       child: ListTile(
@@ -290,8 +402,15 @@ class _EmployeeInputTile extends StatelessWidget {
             style:
                 const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
         subtitle: savedLabel != null
-            ? Text('已存: $savedLabel',
-                style: const TextStyle(fontSize: 12, color: Colors.green))
+            ? Text(
+                isDirty ? '原值: $savedLabel' : '已存: $savedLabel',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDirty
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.green,
+                ),
+              )
             : null,
         trailing: SizedBox(
           width: 140,
@@ -302,9 +421,10 @@ class _EmployeeInputTile extends StatelessWidget {
             keyboardType:
                 const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}$'))
             ],
             textInputAction: TextInputAction.next,
+            onChanged: onChanged,
             onSubmitted: (_) => onSubmitted(),
             style: const TextStyle(
                 fontWeight: FontWeight.bold,

@@ -11,6 +11,7 @@ class WorkbenchState {
   final List<Employee> employees;
   final Map<int, double> savedAmounts; // employeeId -> amount（已存入DB的）
   final bool isLoading;
+  final bool isSaving;
 
   const WorkbenchState({
     required this.selectedYear,
@@ -18,6 +19,7 @@ class WorkbenchState {
     this.employees = const [],
     this.savedAmounts = const {},
     this.isLoading = false,
+    this.isSaving = false,
   });
 
   double get totalAmount =>
@@ -29,6 +31,7 @@ class WorkbenchState {
     List<Employee>? employees,
     Map<int, double>? savedAmounts,
     bool? isLoading,
+    bool? isSaving,
   }) {
     return WorkbenchState(
       selectedYear: selectedYear ?? this.selectedYear,
@@ -36,6 +39,7 @@ class WorkbenchState {
       employees: employees ?? this.employees,
       savedAmounts: savedAmounts ?? this.savedAmounts,
       isLoading: isLoading ?? this.isLoading,
+      isSaving: isSaving ?? this.isSaving,
     );
   }
 }
@@ -106,12 +110,11 @@ class WorkbenchViewModel extends StateNotifier<WorkbenchState> {
   Future<void> saveAll(Map<int, double> amounts) async {
     final year = state.selectedYear;
     final month = state.selectedMonth;
-    for (final entry in amounts.entries) {
-      if (entry.value > 0) {
-        await _salaryRepo.upsertRecord(entry.key, year, month, entry.value);
-      } else {
-        await _salaryRepo.deleteRecord(entry.key, year, month);
-      }
+    state = state.copyWith(isSaving: true);
+    try {
+      await _salaryRepo.saveMonthAmounts(year, month, amounts);
+    } finally {
+      state = state.copyWith(isSaving: false);
     }
   }
 
