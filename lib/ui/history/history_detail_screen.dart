@@ -22,7 +22,7 @@ class HistoryDetailScreen extends ConsumerWidget {
     final fmt = NumberFormat('#,##0.00', 'zh_CN');
 
     return Scaffold(
-      appBar: AppBar(title: Text('$year年$month月 详情')),
+      appBar: AppBar(),
       body: asyncDetail.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('出错了：$e')),

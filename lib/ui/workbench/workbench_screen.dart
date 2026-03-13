@@ -174,7 +174,6 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('工作台'),
         actions: [
           TextButton(
             onPressed: state.isLoading || state.isSaving || !hasPendingChanges

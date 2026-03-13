@@ -29,7 +29,6 @@ class SalaryReportDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_batchLabel(batch)),
         actions: [
           IconButton(
             onPressed: () => _exportBatch(context, ref),

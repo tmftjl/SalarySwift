@@ -13,7 +13,6 @@ class EmployeesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('员工管理'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline, size: 28),
