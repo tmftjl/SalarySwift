@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:salary_swift/data/db/app_database.dart';
+import 'package:salary_swift/ui/history/history_viewmodel.dart';
 import 'workbench_viewmodel.dart';
 
 class WorkbenchScreen extends ConsumerStatefulWidget {
@@ -168,6 +169,7 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
     }
 
     await ref.read(workbenchViewModelProvider.notifier).saveAll(amounts);
+    ref.invalidate(historyViewModelProvider);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

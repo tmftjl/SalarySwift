@@ -37,10 +37,16 @@ class PdfExporter {
 
   static Future<pw.Document> _buildReportPdf(
       SalaryBatch batch, List<SalaryDetailItem> items) async {
-    final pdf = pw.Document();
+    final regularFont = await _loadFont('assets/fonts/SimHei.ttf');
+    final boldFont = regularFont;
+    final fontFallback = <pw.Font>[regularFont, boldFont];
+    final theme = pw.ThemeData.withFont(
+      base: regularFont,
+      bold: boldFont,
+      fontFallback: fontFallback,
+    );
+    final pdf = pw.Document(theme: theme);
     final fmt = NumberFormat('#,##0.00', 'zh_CN');
-    final regularFont = await _loadFont('assets/fonts/NotoSansSC-Regular.otf');
-    final boldFont = await _loadFont('assets/fonts/NotoSansSC-Bold.otf');
 
     // 提取所有月份列（排序去重）
     final monthKeys = <String>{};
@@ -78,28 +84,32 @@ class PdfExporter {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.blueGrey100),
       children: [
-        _cell('姓名', boldFont, isHeader: true),
+        _cell('姓名', boldFont, fontFallback: fontFallback, isHeader: true),
         ...months.map((m) => _cell(_fmtMonthKey(m), boldFont,
-            isHeader: true, fontSize: 9)),
-        _cell('合计', boldFont, isHeader: true),
+            fontFallback: fontFallback, isHeader: true, fontSize: 9)),
+        _cell('合计', boldFont, fontFallback: fontFallback, isHeader: true),
       ],
     );
 
     // 数据行
     final dataRows = employeeNames.map((name) {
       double total = 0;
-      final cells = <pw.Widget>[_cell(name, regularFont)];
+      final cells = <pw.Widget>[
+        _cell(name, regularFont, fontFallback: fontFallback)
+      ];
       for (final m in months) {
         final amt = lookup[m]?[name] ?? 0;
         total += amt;
         cells.add(_cell(
           amt > 0 ? fmt.format(amt) : '-',
           regularFont,
+          fontFallback: fontFallback,
           align: pw.TextAlign.right,
           fontSize: 9,
         ));
       }
       cells.add(_cell(fmt.format(total), boldFont,
+          fontFallback: fontFallback,
           align: pw.TextAlign.right, fontSize: 9));
       return pw.TableRow(children: cells);
     }).toList();
@@ -108,16 +118,18 @@ class PdfExporter {
     final totalRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.blueGrey50),
       children: [
-        _cell('合计', boldFont),
+        _cell('合计', boldFont, fontFallback: fontFallback),
         ...months.map((m) {
           final colTotal =
               (lookup[m]?.values ?? []).fold(0.0, (s, a) => s + a);
           return _cell(fmt.format(colTotal), boldFont,
+              fontFallback: fontFallback,
               align: pw.TextAlign.right, fontSize: 9);
         }),
         () {
           final grand = items.fold(0.0, (s, i) => s + i.amount);
           return _cell(fmt.format(grand), boldFont,
+              fontFallback: fontFallback,
               align: pw.TextAlign.right, fontSize: 9);
         }(),
       ],
@@ -127,19 +139,28 @@ class PdfExporter {
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(32),
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(32),
+          theme: theme,
+        ),
         build: (ctx) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Text('工资汇总表  $batchLabel',
-                style: pw.TextStyle(font: boldFont, fontSize: 16)),
+                style: pw.TextStyle(
+                  font: boldFont,
+                  fontSize: 16,
+                  fontFallback: fontFallback,
+                )),
             pw.SizedBox(height: 4),
             pw.Text('生成时间：${_nowString()}',
                 style: pw.TextStyle(
-                    font: regularFont,
-                    fontSize: 10,
-                    color: PdfColors.grey600)),
+                  font: regularFont,
+                  fontSize: 10,
+                  color: PdfColors.grey600,
+                  fontFallback: fontFallback,
+                )),
             pw.SizedBox(height: 14),
             pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey300),
@@ -150,9 +171,11 @@ class PdfExporter {
             pw.Text(
               '共 ${employeeNames.length} 人  ${months.length} 个月',
               style: pw.TextStyle(
-                  font: regularFont,
-                  fontSize: 10,
-                  color: PdfColors.grey600),
+                font: regularFont,
+                fontSize: 10,
+                color: PdfColors.grey600,
+                fontFallback: fontFallback,
+              ),
             ),
           ],
         ),
@@ -167,6 +190,7 @@ class PdfExporter {
   static pw.Widget _cell(
     String text,
     pw.Font font, {
+    List<pw.Font> fontFallback = const [],
     bool isHeader = false,
     pw.TextAlign align = pw.TextAlign.left,
     double fontSize = 10,
@@ -175,8 +199,11 @@ class PdfExporter {
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       child: pw.Text(
         text,
-        style:
-            pw.TextStyle(font: font, fontSize: isHeader ? 10 : fontSize),
+        style: pw.TextStyle(
+          font: font,
+          fontSize: isHeader ? 10 : fontSize,
+          fontFallback: fontFallback,
+        ),
         textAlign: align,
       ),
     );

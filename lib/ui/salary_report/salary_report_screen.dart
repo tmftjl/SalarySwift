@@ -154,7 +154,7 @@ class SalaryReportScreen extends ConsumerWidget {
     final state = ref.watch(salaryReportViewModelProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('历史工资')),
+      appBar: AppBar(title: const Text('工资报表')),
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.batches.isEmpty

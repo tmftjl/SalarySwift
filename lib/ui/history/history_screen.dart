@@ -13,7 +13,7 @@ class HistoryScreen extends ConsumerWidget {
     final fmt = NumberFormat('#,##0.00', 'zh_CN');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('历史记录')),
+      appBar: AppBar(title: const Text('历史工资')),
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.months.isEmpty

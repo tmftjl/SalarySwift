@@ -5,7 +5,7 @@ import 'package:salary_swift/data/db/dao/salary_record_dao.dart';
 import 'package:salary_swift/data/repository/salary_repository.dart';
 
 final _monthDetailProvider =
-    FutureProvider.family<List<SalaryDetailItem>, (int, int)>(
+    FutureProvider.autoDispose.family<List<SalaryDetailItem>, (int, int)>(
         (ref, ym) {
   return ref.watch(salaryRepositoryProvider).getDetailForMonth(ym.$1, ym.$2);
 });

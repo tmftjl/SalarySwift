@@ -17,8 +17,8 @@ class _MainScreenState extends State<MainScreen> {
   final _pages = const [
     WorkbenchScreen(),
     EmployeesScreen(),
-    SalaryReportScreen(),
     HistoryScreen(),
+    SalaryReportScreen(),
   ];
 
   @override
@@ -45,14 +45,14 @@ class _MainScreenState extends State<MainScreen> {
             label: '员工库',
           ),
           NavigationDestination(
-            icon: Icon(Icons.table_chart_outlined),
-            selectedIcon: Icon(Icons.table_chart),
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
             label: '历史工资',
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: '历史记录',
+            icon: Icon(Icons.table_chart_outlined),
+            selectedIcon: Icon(Icons.table_chart),
+            label: '工资报表',
           ),
         ],
       ),
