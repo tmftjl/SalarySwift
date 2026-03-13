@@ -12,9 +12,15 @@ class BatchDao extends DatabaseAccessor<AppDatabase> with _$BatchDaoMixin {
   Future<void> insertBatch(BatchesCompanion entry) =>
       into(batches).insert(entry);
 
-  /// 监听批次列表（按创建时间倒序）
+  /// 监听批次列表（按结束时间、开始时间倒序）
   Stream<List<SalaryBatch>> watchBatches() => (select(batches)
-        ..orderBy([(b) => OrderingTerm.desc(b.createdAt)]))
+        ..orderBy([
+          (b) => OrderingTerm.desc(b.endYear),
+          (b) => OrderingTerm.desc(b.endMonth),
+          (b) => OrderingTerm.desc(b.startYear),
+          (b) => OrderingTerm.desc(b.startMonth),
+          (b) => OrderingTerm.desc(b.createdAt),
+        ]))
       .watch();
 
   Future<bool> existsBatchRange(

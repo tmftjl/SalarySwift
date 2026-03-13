@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:salary_swift/data/db/app_database.dart';
 import 'package:salary_swift/data/repository/batch_repository.dart';
-import 'package:salary_swift/util/pdf_exporter.dart';
+
+import 'salary_report_detail_screen.dart';
 import 'salary_report_viewmodel.dart';
 
 class SalaryReportScreen extends ConsumerWidget {
   const SalaryReportScreen({super.key});
 
   String _batchLabel(SalaryBatch batch) {
-    final start =
-        '${batch.startYear}年${batch.startMonth}月';
+    final start = '${batch.startYear}年${batch.startMonth}月';
     final end = '${batch.endYear}年${batch.endMonth}月';
     return start == end ? start : '$start ~ $end';
   }
@@ -31,7 +31,6 @@ class SalaryReportScreen extends ConsumerWidget {
     int startMonth = now.month;
     int endYear = now.year;
     int endMonth = now.month;
-
     final years = List.generate(11, (i) => now.year - 5 + i);
 
     final confirmed = await showDialog<bool>(
@@ -95,8 +94,9 @@ class SalaryReportScreen extends ConsumerWidget {
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消')),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
+            ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('创建'),
@@ -121,31 +121,31 @@ class SalaryReportScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _exportBatch(
-      BuildContext context, WidgetRef ref, SalaryBatch batch) async {
-    try {
-      final items = await ref
-          .read(salaryReportViewModelProvider.notifier)
-          .getDetailForBatch(batch);
-      if (items.isEmpty) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('该批次范围内暂无工资数据'),
-                behavior: SnackBarBehavior.floating),
-          );
-        }
-        return;
-      }
-      await PdfExporter.exportSalaryReport(batch: batch, items: items);
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('导出失败：$e'),
-              behavior: SnackBarBehavior.floating),
-        );
-      }
+  Future<void> _deleteBatch(
+    BuildContext context,
+    WidgetRef ref,
+    SalaryBatch batch,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除批次？'),
+        content: const Text('仅删除批次记录，不影响工资数据。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true && context.mounted) {
+      await ref.read(salaryReportViewModelProvider.notifier).deleteBatch(batch.id);
     }
   }
 
@@ -167,32 +167,16 @@ class SalaryReportScreen extends ConsumerWidget {
                     final batch = state.batches[i];
                     return _BatchCard(
                       label: _batchLabel(batch),
-                      onExport: () => _exportBatch(context, ref, batch),
-                      onDelete: () async {
-                        final ok = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('删除批次？'),
-                            content:
-                                const Text('仅删除批次记录，不影响工资数据。'),
-                            actions: [
-                              TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('取消')),
-                              TextButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('删除',
-                                      style:
-                                          TextStyle(color: Colors.red))),
-                            ],
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                SalaryReportDetailScreen(batch: batch),
                           ),
                         );
-                        if (ok == true) {
-                          await ref
-                              .read(salaryReportViewModelProvider.notifier)
-                              .deleteBatch(batch.id);
-                        }
                       },
+                      onDelete: () => _deleteBatch(context, ref, batch),
                     );
                   },
                 ),
@@ -208,12 +192,12 @@ class SalaryReportScreen extends ConsumerWidget {
 class _BatchCard extends StatelessWidget {
   const _BatchCard({
     required this.label,
-    required this.onExport,
+    required this.onTap,
     required this.onDelete,
   });
 
   final String label;
-  final VoidCallback onExport;
+  final VoidCallback onTap;
   final VoidCallback onDelete;
 
   @override
@@ -224,47 +208,54 @@ class _BatchCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(Icons.receipt_long_outlined,
-                  color: Theme.of(context).colorScheme.primary),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(Icons.receipt_long_outlined,
+                      color: Theme.of(context).colorScheme.primary),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline,
+                      color: Colors.redAccent, size: 20),
+                  tooltip: '删除批次',
+                ),
+                const Icon(Icons.chevron_right, color: Colors.grey),
+              ],
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(label,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-            IconButton(
-              onPressed: onExport,
-              icon: Icon(Icons.table_chart_outlined,
-                  color: Theme.of(context).colorScheme.primary),
-              tooltip: '导出工资表格',
-            ),
-            IconButton(
-              onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline,
-                  color: Colors.redAccent, size: 20),
-              tooltip: '删除批次',
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -282,12 +273,10 @@ class _EmptyReport extends StatelessWidget {
               size: 80, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           Text('暂无结算批次',
-              style:
-                  TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
           const SizedBox(height: 8),
           Text('点击右下角 + 新建结算批次',
-              style:
-                  TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
         ],
       ),
     );
@@ -326,7 +315,9 @@ class _YearMonthDropdown extends StatelessWidget {
               .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
               .toList(),
           onChanged: (v) {
-            if (v != null) onChanged(v);
+            if (v != null) {
+              onChanged(v);
+            }
           },
         ),
       ),

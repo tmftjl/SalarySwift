@@ -10,6 +10,7 @@ class WorkbenchState {
   final int selectedMonth;
   final List<Employee> employees;
   final Map<int, double> savedAmounts; // employeeId -> amount（已存入DB的）
+  final Map<int, double> draftAmounts; // employeeId -> amount（未保存草稿）
   final bool isLoading;
   final bool isSaving;
 
@@ -18,6 +19,7 @@ class WorkbenchState {
     required this.selectedMonth,
     this.employees = const [],
     this.savedAmounts = const {},
+    this.draftAmounts = const {},
     this.isLoading = false,
     this.isSaving = false,
   });
@@ -30,6 +32,7 @@ class WorkbenchState {
     int? selectedMonth,
     List<Employee>? employees,
     Map<int, double>? savedAmounts,
+    Map<int, double>? draftAmounts,
     bool? isLoading,
     bool? isSaving,
   }) {
@@ -38,6 +41,7 @@ class WorkbenchState {
       selectedMonth: selectedMonth ?? this.selectedMonth,
       employees: employees ?? this.employees,
       savedAmounts: savedAmounts ?? this.savedAmounts,
+      draftAmounts: draftAmounts ?? this.draftAmounts,
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
     );
@@ -63,7 +67,26 @@ class WorkbenchViewModel extends StateNotifier<WorkbenchState> {
   void _init() {
     _employeeSubscription =
         _employeeRepo.watchActiveEmployees().listen((employees) {
-      state = state.copyWith(employees: employees);
+      final nextDrafts = <int, double>{};
+      final nextSaved = <int, double>{};
+      for (final employee in employees) {
+        final id = employee.id;
+        final saved = state.savedAmounts[id];
+        if (saved != null) {
+          nextSaved[id] = saved;
+        }
+        if (state.draftAmounts.containsKey(id)) {
+          nextDrafts[id] = state.draftAmounts[id]!;
+        } else if (saved != null) {
+          nextDrafts[id] = saved;
+        }
+      }
+
+      state = state.copyWith(
+        employees: employees,
+        savedAmounts: nextSaved,
+        draftAmounts: nextDrafts,
+      );
       if (!state.isLoading) return;
       _subscribeAmounts(state.selectedYear, state.selectedMonth);
     });
@@ -73,15 +96,42 @@ class WorkbenchViewModel extends StateNotifier<WorkbenchState> {
     _amountsSubscription?.cancel();
     _amountsSubscription =
         _salaryRepo.watchAmountsForMonth(year, month).listen((amounts) {
-      state = state.copyWith(savedAmounts: amounts, isLoading: false);
+      final nextDrafts = <int, double>{};
+      for (final employee in state.employees) {
+        final id = employee.id;
+        final saved = amounts[id] ?? 0.0;
+        final previousSaved = state.savedAmounts[id] ?? 0.0;
+        final previousDraft = state.draftAmounts[id] ?? previousSaved;
+        final hasPending =
+            (previousDraft - previousSaved).abs() > 0.0001;
+
+        nextDrafts[id] = state.isSaving || !hasPending ? saved : previousDraft;
+      }
+
+      state = state.copyWith(
+        savedAmounts: amounts,
+        draftAmounts: nextDrafts,
+        isLoading: false,
+      );
     });
   }
 
   /// 切换到指定年月（重新加载对应工资数据）
   Future<void> changeMonth(int year, int month) async {
     state = state.copyWith(
-        selectedYear: year, selectedMonth: month, isLoading: true);
+      selectedYear: year,
+      selectedMonth: month,
+      savedAmounts: const {},
+      draftAmounts: const {},
+      isLoading: true,
+    );
     _subscribeAmounts(year, month);
+  }
+
+  void updateDraftAmount(int employeeId, double amount) {
+    final nextDrafts = Map<int, double>.from(state.draftAmounts);
+    nextDrafts[employeeId] = amount;
+    state = state.copyWith(draftAmounts: nextDrafts);
   }
 
   /// 切换到上一个月

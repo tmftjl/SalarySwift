@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,13 +17,6 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
   final _controllers = <int, TextEditingController>{};
   final _focusNodes = <int, FocusNode>{};
   final _fmt = NumberFormat('#,##0.00', 'zh_CN');
-  final _draftAmounts = <int, double>{};
-
-  // 上次已加载的年月，用于检测切换
-  int _lastLoadedYear = 0;
-  int _lastLoadedMonth = 0;
-  Map<int, double> _lastSyncedAmounts = const {};
-  List<int> _lastEmployeeIds = const [];
 
   @override
   void dispose() {
@@ -45,11 +37,6 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
 
   double _parseAmount(String text) => double.tryParse(text.trim()) ?? 0.0;
 
-  bool _sameEmployeeSet(List<Employee> employees) {
-    final ids = employees.map((e) => e.id).toList(growable: false);
-    return listEquals(ids, _lastEmployeeIds);
-  }
-
   void _syncCachesForEmployees(List<Employee> employees) {
     final validIds = employees.map((e) => e.id).toSet();
 
@@ -58,7 +45,6 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
         .toList(growable: false);
     for (final id in removedControllerIds) {
       _controllers.remove(id)?.dispose();
-      _draftAmounts.remove(id);
     }
 
     final removedFocusIds = _focusNodes.keys
@@ -67,30 +53,27 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
     for (final id in removedFocusIds) {
       _focusNodes.remove(id)?.dispose();
     }
-
-    _lastEmployeeIds = employees.map((e) => e.id).toList(growable: false);
   }
 
-  /// 切换月份或外部数据完成同步时，重置并重新预填控制器。
-  void _syncDraftFromState(WorkbenchState state) {
+  void _syncControllersFromState(WorkbenchState state) {
     _syncCachesForEmployees(state.employees);
 
     for (final employee in state.employees) {
-      final savedAmount = state.savedAmounts[employee.id] ?? 0.0;
+      final draftAmount =
+          state.draftAmounts[employee.id] ?? state.savedAmounts[employee.id] ?? 0.0;
       final controller = _controllerFor(employee.id);
-      controller.text = savedAmount > 0 ? savedAmount.toStringAsFixed(2) : '';
-      _draftAmounts[employee.id] = savedAmount;
+      final desiredText = draftAmount > 0 ? draftAmount.toStringAsFixed(2) : '';
+      final focusNode = _focusNodes[employee.id];
+      if (controller.text != desiredText && !(focusNode?.hasFocus ?? false)) {
+        controller.text = desiredText;
+      }
     }
-
-    _lastLoadedYear = state.selectedYear;
-    _lastLoadedMonth = state.selectedMonth;
-    _lastSyncedAmounts = Map<int, double>.from(state.savedAmounts);
   }
 
   bool _hasPendingChanges(WorkbenchState state) {
     for (final employee in state.employees) {
       final saved = state.savedAmounts[employee.id] ?? 0.0;
-      final draft = _draftAmounts[employee.id] ?? saved;
+      final draft = state.draftAmounts[employee.id] ?? saved;
       if ((saved - draft).abs() > 0.0001) {
         return true;
       }
@@ -101,7 +84,7 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
   double _draftTotal(WorkbenchState state) {
     var total = 0.0;
     for (final employee in state.employees) {
-      total += _draftAmounts[employee.id] ??
+      total += state.draftAmounts[employee.id] ??
           (state.savedAmounts[employee.id] ?? 0.0);
     }
     return total;
@@ -111,7 +94,7 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
     final changed = <int, double>{};
     for (final employee in state.employees) {
       final saved = state.savedAmounts[employee.id] ?? 0.0;
-      final draft = _draftAmounts[employee.id] ?? saved;
+      final draft = state.draftAmounts[employee.id] ?? saved;
       if ((saved - draft).abs() <= 0.0001) {
         continue;
       }
@@ -182,24 +165,8 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workbenchViewModelProvider);
-    final shouldSyncFromMonthChange =
-        !state.isLoading &&
-        (state.selectedYear != _lastLoadedYear ||
-            state.selectedMonth != _lastLoadedMonth);
-    final shouldSyncFromExternalUpdate =
-        !state.isLoading &&
-        !_hasPendingChanges(state) &&
-        (!mapEquals(state.savedAmounts, _lastSyncedAmounts) ||
-            !_sameEmployeeSet(state.employees));
-
-    if (shouldSyncFromMonthChange || shouldSyncFromExternalUpdate) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _syncDraftFromState(state);
-          });
-        }
-      });
+    if (!state.isLoading) {
+      _syncControllersFromState(state);
     }
 
     final hasPendingChanges = _hasPendingChanges(state);
@@ -254,7 +221,7 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
                           itemBuilder: (_, i) {
                             final emp = state.employees[i];
                             final saved = state.savedAmounts[emp.id] ?? 0.0;
-                            final draft = _draftAmounts[emp.id] ?? saved;
+                            final draft = state.draftAmounts[emp.id] ?? saved;
                             final isDirty = (saved - draft).abs() > 0.0001;
                             return _EmployeeInputTile(
                               employee: emp,
@@ -265,9 +232,9 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
                               savedLabel:
                                   saved > 0 ? '¥ ${_fmt.format(saved)}' : null,
                               onChanged: (value) {
-                                setState(() {
-                                  _draftAmounts[emp.id] = _parseAmount(value);
-                                });
+                                ref
+                                    .read(workbenchViewModelProvider.notifier)
+                                    .updateDraftAmount(emp.id, _parseAmount(value));
                               },
                               onSubmitted: () {
                                 final nextIndex = i + 1;

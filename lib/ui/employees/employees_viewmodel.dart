@@ -5,7 +5,7 @@ import 'package:salary_swift/data/db/app_database.dart';
 import 'package:salary_swift/data/repository/employee_repository.dart';
 
 final employeesViewModelProvider =
-    StateNotifierProvider<EmployeesViewModel, AsyncValue<List<Employee>>>((ref) {
+    StateNotifierProvider.autoDispose<EmployeesViewModel, AsyncValue<List<Employee>>>((ref) {
   return EmployeesViewModel(ref.watch(employeeRepositoryProvider));
 });
 

@@ -14,20 +14,25 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final _pages = const [
-    WorkbenchScreen(),
-    EmployeesScreen(),
-    HistoryScreen(),
-    SalaryReportScreen(),
-  ];
+  Widget _buildCurrentPage() {
+    switch (_currentIndex) {
+      case 0:
+        return const WorkbenchScreen();
+      case 1:
+        return const EmployeesScreen();
+      case 2:
+        return const HistoryScreen();
+      case 3:
+        return const SalaryReportScreen();
+      default:
+        return const WorkbenchScreen();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: _buildCurrentPage(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         elevation: 0,

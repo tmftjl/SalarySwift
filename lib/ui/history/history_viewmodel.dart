@@ -33,6 +33,6 @@ class HistoryViewModel extends StateNotifier<HistoryState> {
 }
 
 final historyViewModelProvider =
-    StateNotifierProvider<HistoryViewModel, HistoryState>((ref) {
+    StateNotifierProvider.autoDispose<HistoryViewModel, HistoryState>((ref) {
   return HistoryViewModel(ref.watch(salaryRepositoryProvider));
 });

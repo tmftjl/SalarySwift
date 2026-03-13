@@ -3,6 +3,7 @@ import 'package:salary_swift/data/db/app_database.dart';
 import 'package:salary_swift/data/repository/batch_repository.dart';
 import 'package:salary_swift/data/repository/salary_repository.dart';
 import 'package:salary_swift/data/db/dao/salary_record_dao.dart';
+import 'dart:async';
 
 class SalaryReportState {
   final List<SalaryBatch> batches;
@@ -14,10 +15,11 @@ class SalaryReportState {
 class SalaryReportViewModel extends StateNotifier<SalaryReportState> {
   final BatchRepository _batchRepo;
   final SalaryRepository _salaryRepo;
+  StreamSubscription<List<SalaryBatch>>? _subscription;
 
   SalaryReportViewModel(this._batchRepo, this._salaryRepo)
       : super(const SalaryReportState(isLoading: true)) {
-    _batchRepo.watchBatches().listen((batches) {
+    _subscription = _batchRepo.watchBatches().listen((batches) {
       state = SalaryReportState(batches: batches, isLoading: false);
     });
   }
@@ -32,10 +34,16 @@ class SalaryReportViewModel extends StateNotifier<SalaryReportState> {
   Future<List<SalaryDetailItem>> getDetailForBatch(SalaryBatch batch) =>
       _salaryRepo.getDetailForRange(
           batch.startYear, batch.startMonth, batch.endYear, batch.endMonth);
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
 }
 
 final salaryReportViewModelProvider =
-    StateNotifierProvider<SalaryReportViewModel, SalaryReportState>((ref) {
+    StateNotifierProvider.autoDispose<SalaryReportViewModel, SalaryReportState>((ref) {
   return SalaryReportViewModel(
     ref.watch(batchRepositoryProvider),
     ref.watch(salaryRepositoryProvider),
