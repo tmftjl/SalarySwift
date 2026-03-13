@@ -8,7 +8,8 @@ class SalaryRecords extends Table {
   IntColumn get employeeId => integer().references(Employees, #id)();
   IntColumn get year => integer()();
   IntColumn get month => integer()();
-  RealColumn get amount => real()();
+  // 以“分”为单位存储，避免浮点精度误差。
+  IntColumn get amount => integer()();
 
   @override
   List<Set<Column>> get uniqueKeys => [

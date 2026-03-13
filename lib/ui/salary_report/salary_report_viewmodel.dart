@@ -22,9 +22,9 @@ class SalaryReportViewModel extends StateNotifier<SalaryReportState> {
     });
   }
 
-  Future<void> createBatch(
+  Future<BatchCreationError?> createBatch(
       int startYear, int startMonth, int endYear, int endMonth) async {
-    await _batchRepo.insertBatch(startYear, startMonth, endYear, endMonth);
+    return _batchRepo.insertBatch(startYear, startMonth, endYear, endMonth);
   }
 
   Future<void> deleteBatch(int id) => _batchRepo.deleteBatch(id);

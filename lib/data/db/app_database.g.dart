@@ -297,9 +297,9 @@ class $SalaryRecordsTable extends SalaryRecords
       type: DriftSqlType.int, requiredDuringInsert: true);
   static const VerificationMeta _amountMeta = const VerificationMeta('amount');
   @override
-  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+  late final GeneratedColumn<int> amount = GeneratedColumn<int>(
       'amount', aliasedName, false,
-      type: DriftSqlType.double, requiredDuringInsert: true);
+      type: DriftSqlType.int, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns => [id, employeeId, year, month, amount];
   @override
@@ -363,7 +363,7 @@ class $SalaryRecordsTable extends SalaryRecords
       month: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}month'])!,
       amount: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
+          .read(DriftSqlType.int, data['${effectivePrefix}amount'])!,
     );
   }
 
@@ -378,7 +378,7 @@ class SalaryRecord extends DataClass implements Insertable<SalaryRecord> {
   final int employeeId;
   final int year;
   final int month;
-  final double amount;
+  final int amount;
   const SalaryRecord(
       {required this.id,
       required this.employeeId,
@@ -392,7 +392,7 @@ class SalaryRecord extends DataClass implements Insertable<SalaryRecord> {
     map['employee_id'] = Variable<int>(employeeId);
     map['year'] = Variable<int>(year);
     map['month'] = Variable<int>(month);
-    map['amount'] = Variable<double>(amount);
+    map['amount'] = Variable<int>(amount);
     return map;
   }
 
@@ -414,7 +414,7 @@ class SalaryRecord extends DataClass implements Insertable<SalaryRecord> {
       employeeId: serializer.fromJson<int>(json['employeeId']),
       year: serializer.fromJson<int>(json['year']),
       month: serializer.fromJson<int>(json['month']),
-      amount: serializer.fromJson<double>(json['amount']),
+      amount: serializer.fromJson<int>(json['amount']),
     );
   }
   @override
@@ -425,12 +425,12 @@ class SalaryRecord extends DataClass implements Insertable<SalaryRecord> {
       'employeeId': serializer.toJson<int>(employeeId),
       'year': serializer.toJson<int>(year),
       'month': serializer.toJson<int>(month),
-      'amount': serializer.toJson<double>(amount),
+      'amount': serializer.toJson<int>(amount),
     };
   }
 
   SalaryRecord copyWith(
-          {int? id, int? employeeId, int? year, int? month, double? amount}) =>
+          {int? id, int? employeeId, int? year, int? month, int? amount}) =>
       SalaryRecord(
         id: id ?? this.id,
         employeeId: employeeId ?? this.employeeId,
@@ -479,7 +479,7 @@ class SalaryRecordsCompanion extends UpdateCompanion<SalaryRecord> {
   final Value<int> employeeId;
   final Value<int> year;
   final Value<int> month;
-  final Value<double> amount;
+  final Value<int> amount;
   const SalaryRecordsCompanion({
     this.id = const Value.absent(),
     this.employeeId = const Value.absent(),
@@ -492,7 +492,7 @@ class SalaryRecordsCompanion extends UpdateCompanion<SalaryRecord> {
     required int employeeId,
     required int year,
     required int month,
-    required double amount,
+    required int amount,
   })  : employeeId = Value(employeeId),
         year = Value(year),
         month = Value(month),
@@ -502,7 +502,7 @@ class SalaryRecordsCompanion extends UpdateCompanion<SalaryRecord> {
     Expression<int>? employeeId,
     Expression<int>? year,
     Expression<int>? month,
-    Expression<double>? amount,
+    Expression<int>? amount,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -518,7 +518,7 @@ class SalaryRecordsCompanion extends UpdateCompanion<SalaryRecord> {
       Value<int>? employeeId,
       Value<int>? year,
       Value<int>? month,
-      Value<double>? amount}) {
+      Value<int>? amount}) {
     return SalaryRecordsCompanion(
       id: id ?? this.id,
       employeeId: employeeId ?? this.employeeId,
@@ -544,7 +544,7 @@ class SalaryRecordsCompanion extends UpdateCompanion<SalaryRecord> {
       map['month'] = Variable<int>(month.value);
     }
     if (amount.present) {
-      map['amount'] = Variable<double>(amount.value);
+      map['amount'] = Variable<int>(amount.value);
     }
     return map;
   }
@@ -1042,7 +1042,7 @@ typedef $$SalaryRecordsTableCreateCompanionBuilder = SalaryRecordsCompanion
   required int employeeId,
   required int year,
   required int month,
-  required double amount,
+  required int amount,
 });
 typedef $$SalaryRecordsTableUpdateCompanionBuilder = SalaryRecordsCompanion
     Function({
@@ -1050,7 +1050,7 @@ typedef $$SalaryRecordsTableUpdateCompanionBuilder = SalaryRecordsCompanion
   Value<int> employeeId,
   Value<int> year,
   Value<int> month,
-  Value<double> amount,
+  Value<int> amount,
 });
 
 class $$SalaryRecordsTableTableManager extends RootTableManager<
@@ -1074,7 +1074,7 @@ class $$SalaryRecordsTableTableManager extends RootTableManager<
             Value<int> employeeId = const Value.absent(),
             Value<int> year = const Value.absent(),
             Value<int> month = const Value.absent(),
-            Value<double> amount = const Value.absent(),
+            Value<int> amount = const Value.absent(),
           }) =>
               SalaryRecordsCompanion(
             id: id,
@@ -1088,7 +1088,7 @@ class $$SalaryRecordsTableTableManager extends RootTableManager<
             required int employeeId,
             required int year,
             required int month,
-            required double amount,
+            required int amount,
           }) =>
               SalaryRecordsCompanion.insert(
             id: id,
@@ -1118,7 +1118,7 @@ class $$SalaryRecordsTableFilterComposer
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
 
-  ColumnFilters<double> get amount => $state.composableBuilder(
+  ColumnFilters<int> get amount => $state.composableBuilder(
       column: $state.table.amount,
       builder: (column, joinBuilders) =>
           ColumnFilters(column, joinBuilders: joinBuilders));
@@ -1154,7 +1154,7 @@ class $$SalaryRecordsTableOrderingComposer
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));
 
-  ColumnOrderings<double> get amount => $state.composableBuilder(
+  ColumnOrderings<int> get amount => $state.composableBuilder(
       column: $state.table.amount,
       builder: (column, joinBuilders) =>
           ColumnOrderings(column, joinBuilders: joinBuilders));

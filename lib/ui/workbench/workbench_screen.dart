@@ -119,6 +119,48 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
     return changed;
   }
 
+  Future<bool> _confirmDiscardChanges() async {
+    final shouldDiscard = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('放弃未保存修改？'),
+        content: const Text('你刚修改的工资还没保存，切换月份后这些修改会丢失。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('继续编辑'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('放弃并切换'),
+          ),
+        ],
+      ),
+    );
+
+    return shouldDiscard ?? false;
+  }
+
+  Future<void> _handleMonthChange(
+    WorkbenchState state,
+    Future<void> Function() changeAction,
+  ) async {
+    if (state.isLoading || state.isSaving) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
+    if (_hasPendingChanges(state)) {
+      final shouldDiscard = await _confirmDiscardChanges();
+      if (!shouldDiscard || !mounted) {
+        return;
+      }
+    }
+
+    await changeAction();
+  }
+
   Future<void> _saveAll(WorkbenchState state) async {
     final amounts = _collectChangedAmounts(state);
     if (amounts.isEmpty) {
@@ -189,10 +231,15 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
                   total: totalAmount,
                   fmt: _fmt,
                   hasPendingChanges: hasPendingChanges,
-                  onPrev: () =>
-                      ref.read(workbenchViewModelProvider.notifier).prevMonth(),
-                  onNext: () =>
-                      ref.read(workbenchViewModelProvider.notifier).nextMonth(),
+                  canChangeMonth: !state.isLoading && !state.isSaving,
+                  onPrev: () => _handleMonthChange(
+                    state,
+                    () => ref.read(workbenchViewModelProvider.notifier).prevMonth(),
+                  ),
+                  onNext: () => _handleMonthChange(
+                    state,
+                    () => ref.read(workbenchViewModelProvider.notifier).nextMonth(),
+                  ),
                 ),
                 Expanded(
                   child: state.employees.isEmpty
@@ -249,6 +296,7 @@ class _MonthSelector extends StatelessWidget {
     required this.total,
     required this.fmt,
     required this.hasPendingChanges,
+    required this.canChangeMonth,
     required this.onPrev,
     required this.onNext,
   });
@@ -258,6 +306,7 @@ class _MonthSelector extends StatelessWidget {
   final double total;
   final NumberFormat fmt;
   final bool hasPendingChanges;
+  final bool canChangeMonth;
   final VoidCallback onPrev;
   final VoidCallback onNext;
 
@@ -292,7 +341,7 @@ class _MonthSelector extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                onPressed: onPrev,
+                onPressed: canChangeMonth ? onPrev : null,
                 icon: const Icon(Icons.chevron_left, color: Colors.white),
                 visualDensity: VisualDensity.compact,
               ),
@@ -304,7 +353,7 @@ class _MonthSelector extends StatelessWidget {
                     fontWeight: FontWeight.bold),
               ),
               IconButton(
-                onPressed: onNext,
+                onPressed: canChangeMonth ? onNext : null,
                 icon: const Icon(Icons.chevron_right, color: Colors.white),
                 visualDensity: VisualDensity.compact,
               ),

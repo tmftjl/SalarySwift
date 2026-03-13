@@ -23,7 +23,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -36,6 +36,19 @@ class AppDatabase extends _$AppDatabase {
             await customStatement('DROP TABLE IF EXISTS salary_records');
             await m.createTable(salaryRecords);
             await m.createTable(batches);
+          }
+          if (from < 3) {
+            await customStatement(
+              'ALTER TABLE salary_records RENAME TO salary_records_old',
+            );
+            await m.createTable(salaryRecords);
+            await customStatement('''
+              INSERT INTO salary_records (id, employee_id, year, month, amount)
+              SELECT id, employee_id, year, month,
+                     CAST(ROUND(amount * 100.0) AS INTEGER)
+              FROM salary_records_old
+            ''');
+            await customStatement('DROP TABLE salary_records_old');
           }
         },
       );

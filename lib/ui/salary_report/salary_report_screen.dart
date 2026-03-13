@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:salary_swift/data/db/app_database.dart';
+import 'package:salary_swift/data/repository/batch_repository.dart';
 import 'package:salary_swift/util/pdf_exporter.dart';
 import 'salary_report_viewmodel.dart';
 
@@ -12,6 +13,15 @@ class SalaryReportScreen extends ConsumerWidget {
         '${batch.startYear}年${batch.startMonth}月';
     final end = '${batch.endYear}年${batch.endMonth}月';
     return start == end ? start : '$start ~ $end';
+  }
+
+  String _batchErrorMessage(BatchCreationError error) {
+    switch (error) {
+      case BatchCreationError.invalidRange:
+        return '结束月份不能早于开始月份';
+      case BatchCreationError.duplicateRange:
+        return '相同时间范围的结算批次已存在';
+    }
   }
 
   Future<void> _showCreateBatchDialog(
@@ -97,9 +107,17 @@ class SalaryReportScreen extends ConsumerWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      await ref
+      final error = await ref
           .read(salaryReportViewModelProvider.notifier)
           .createBatch(startYear, startMonth, endYear, endMonth);
+      if (error != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_batchErrorMessage(error)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 

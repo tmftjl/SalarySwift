@@ -42,6 +42,10 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
     with _$SalaryRecordDaoMixin {
   SalaryRecordDao(super.db);
 
+  double _fromCents(int cents) => cents / 100.0;
+
+  int _toCents(double amount) => (amount * 100).round();
+
   // ── 工作台：按年月读写 ────────────────────────────────
 
   /// 监听某年月的 employeeId -> amount 映射
@@ -49,7 +53,9 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
     return (select(salaryRecords)
           ..where((r) => r.year.equals(year) & r.month.equals(month)))
         .watch()
-        .map((rows) => {for (final r in rows) r.employeeId: r.amount});
+        .map((rows) => {
+              for (final r in rows) r.employeeId: _fromCents(r.amount),
+            });
   }
 
   /// 一次性获取某年月的 employeeId -> amount 映射
@@ -57,7 +63,9 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
     final rows = await (select(salaryRecords)
           ..where((r) => r.year.equals(year) & r.month.equals(month)))
         .get();
-    return {for (final r in rows) r.employeeId: r.amount};
+    return {
+      for (final r in rows) r.employeeId: _fromCents(r.amount),
+    };
   }
 
   /// 插入或覆盖某员工某月工资（依赖唯一约束 employeeId+year+month）
@@ -68,7 +76,7 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
         employeeId: employeeId,
         year: year,
         month: month,
-        amount: amount,
+        amount: _toCents(amount),
       ),
     );
   }
@@ -97,7 +105,7 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
     final query = customSelect(
       '''
       SELECT year, month,
-             SUM(amount)  AS total_amount,
+             SUM(amount) / 100.0 AS total_amount,
              COUNT(*)     AS employee_count
       FROM salary_records
       GROUP BY year, month
@@ -120,7 +128,7 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
     final query = customSelect(
       '''
       SELECT e.id AS employee_id, e.name AS employee_name,
-             sr.year, sr.month, sr.amount
+             sr.year, sr.month, sr.amount / 100.0 AS amount
       FROM salary_records sr
       INNER JOIN employees e ON e.id = sr.employee_id
       WHERE sr.year = ? AND sr.month = ?
@@ -152,7 +160,7 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
     final query = customSelect(
       '''
       SELECT e.id AS employee_id, e.name AS employee_name,
-             sr.year, sr.month, sr.amount
+             sr.year, sr.month, sr.amount / 100.0 AS amount
       FROM salary_records sr
       INNER JOIN employees e ON e.id = sr.employee_id
       WHERE sr.year * 100 + sr.month BETWEEN ? AND ?

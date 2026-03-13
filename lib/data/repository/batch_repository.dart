@@ -2,6 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:salary_swift/data/db/app_database.dart';
 import 'package:salary_swift/data/db/database_provider.dart';
 
+enum BatchCreationError {
+  invalidRange,
+  duplicateRange,
+}
+
 final batchRepositoryProvider = Provider((ref) {
   return BatchRepository(ref.watch(databaseProvider));
 });
@@ -15,10 +20,22 @@ class BatchRepository {
   Stream<List<SalaryBatch>> watchBatches() => _db.batchDao.watchBatches();
 
   /// 新增结算批次
-  Future<void> insertBatch(
-      int startYear, int startMonth, int endYear, int endMonth) {
+  Future<BatchCreationError?> insertBatch(
+      int startYear, int startMonth, int endYear, int endMonth) async {
+    final startPeriod = startYear * 100 + startMonth;
+    final endPeriod = endYear * 100 + endMonth;
+    if (startPeriod > endPeriod) {
+      return BatchCreationError.invalidRange;
+    }
+
+    final exists = await _db.batchDao
+        .existsBatchRange(startYear, startMonth, endYear, endMonth);
+    if (exists) {
+      return BatchCreationError.duplicateRange;
+    }
+
     final now = DateTime.now().millisecondsSinceEpoch;
-    return _db.batchDao.insertBatch(
+    await _db.batchDao.insertBatch(
       BatchesCompanion.insert(
         startYear: startYear,
         startMonth: startMonth,
@@ -27,6 +44,7 @@ class BatchRepository {
         createdAt: now,
       ),
     );
+    return null;
   }
 
   /// 删除批次
