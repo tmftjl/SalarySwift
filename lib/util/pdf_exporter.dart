@@ -155,15 +155,18 @@ class PdfExporter {
     );
 
     final batchLabel = _batchLabel(batch);
+    final tableBorder =
+        pw.TableBorder.all(color: PdfColor.fromInt(0xFFCDD8F0), width: 0.6);
 
     pdf.addPage(
-      pw.Page(
+      pw.MultiPage(
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4.landscape,
           margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
           theme: theme,
         ),
-        build: (ctx) => pw.Column(
+        // 每页顶部重复表头
+        header: (ctx) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Row(
@@ -176,7 +179,8 @@ class PdfExporter {
                       fontFallback: fontFallback,
                     )),
                 pw.Spacer(),
-                pw.Text('生成时间：${_nowString()}',
+                pw.Text(
+                    '生成时间：${_nowString()}  第 ${ctx.pageNumber} 页',
                     style: pw.TextStyle(
                       font: regularFont,
                       fontSize: 9,
@@ -185,15 +189,22 @@ class PdfExporter {
                     )),
               ],
             ),
-            pw.SizedBox(height: 10),
+            pw.SizedBox(height: 8),
+            // 列标题行在每页重复
             pw.Table(
-              border: pw.TableBorder.all(
-                  color: PdfColor.fromInt(0xFFCDD8F0), width: 0.6),
+              border: tableBorder,
               columnWidths: columnWidths,
-              children: [headerRow, ...dataRows, totalRow],
+              children: [headerRow],
             ),
           ],
         ),
+        build: (ctx) => [
+          pw.Table(
+            border: tableBorder,
+            columnWidths: columnWidths,
+            children: [...dataRows, totalRow],
+          ),
+        ],
       ),
     );
 
