@@ -21,6 +21,8 @@ class SalaryReportScreen extends ConsumerWidget {
         return '结束月份不能早于开始月份';
       case BatchCreationError.duplicateRange:
         return '相同时间范围的结算批次已存在';
+      case BatchCreationError.tooManyMonths:
+        return '结算范围最多 12 个月';
     }
   }
 
@@ -33,18 +35,49 @@ class SalaryReportScreen extends ConsumerWidget {
     int endMonth = now.month;
     final years = List.generate(11, (i) => now.year - 5 + i);
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
-          title: const Text('新建结算批次'),
-          content: Column(
+        builder: (ctx, setS) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            top: 16,
+            left: 20,
+            right: 20,
+          ),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('开始月份',
-                  style: TextStyle(color: Colors.grey, fontSize: 12)),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('新建结算批次',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('开始月份',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500)),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -68,8 +101,14 @@ class SalaryReportScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              const Text('结束月份',
-                  style: TextStyle(color: Colors.grey, fontSize: 12)),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('结束月份',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500)),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -92,21 +131,38 @@ class SalaryReportScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('取消'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: FilledButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('创建'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6))),
-              child: const Text('创建'),
-            ),
-          ],
         ),
       ),
     );
@@ -189,11 +245,11 @@ class SalaryReportScreen extends ConsumerWidget {
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateBatchDialog(context, ref),
-        tooltip: '新建结算批次',
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: const Icon(Icons.add),
+        label: const Text('结算', style: TextStyle(fontWeight: FontWeight.bold)),
+        icon: const Icon(Icons.receipt_long_outlined),
       ),
     );
   }

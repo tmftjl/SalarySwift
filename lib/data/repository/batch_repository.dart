@@ -5,6 +5,7 @@ import 'package:salary_swift/data/db/database_provider.dart';
 enum BatchCreationError {
   invalidRange,
   duplicateRange,
+  tooManyMonths,
 }
 
 final batchRepositoryProvider = Provider((ref) {
@@ -26,6 +27,12 @@ class BatchRepository {
     final endPeriod = endYear * 100 + endMonth;
     if (startPeriod > endPeriod) {
       return BatchCreationError.invalidRange;
+    }
+
+    final monthCount =
+        (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+    if (monthCount > 12) {
+      return BatchCreationError.tooManyMonths;
     }
 
     final exists = await _db.batchDao

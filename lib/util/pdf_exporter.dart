@@ -46,7 +46,7 @@ class PdfExporter {
       fontFallback: fontFallback,
     );
     final pdf = pw.Document(theme: theme);
-    final fmt = NumberFormat('#,##0.00', 'zh_CN');
+    final fmt = NumberFormat('0.00');
 
     // 提取所有月份列（排序去重）
     final monthKeys = <String>{};
@@ -72,10 +72,10 @@ class PdfExporter {
 
     final colCount = 1 + months.length + 1; // 姓名 + 各月 + 合计
 
-    // 固定列宽：A4横向可用宽度786pt，12个月时共748pt，留有余量
-    const nameColW = 60.0;
-    const monthColW = 52.0;
-    const totalColW = 64.0;
+    // A4竖向可用宽度 567pt：名字46 + 12×38 + 合计48 = 550pt，留余量
+    const nameColW = 46.0;
+    const monthColW = 38.0;
+    const totalColW = 48.0;
     final columnWidths = <int, pw.TableColumnWidth>{
       0: const pw.FixedColumnWidth(nameColW),
       colCount - 1: const pw.FixedColumnWidth(totalColW),
@@ -91,17 +91,18 @@ class PdfExporter {
         _cell('姓名', boldFont,
             fontFallback: fontFallback,
             isHeader: true,
+            align: pw.TextAlign.center,
             textColor: PdfColors.white),
         ...months.map((m) => _cell(_fmtMonthKey(m), boldFont,
             fontFallback: fontFallback,
             isHeader: true,
-            fontSize: 9,
+            fontSize: 7,
             align: pw.TextAlign.center,
             textColor: PdfColors.white)),
         _cell('合计', boldFont,
             fontFallback: fontFallback,
             isHeader: true,
-            align: pw.TextAlign.right,
+            align: pw.TextAlign.center,
             textColor: PdfColors.white),
       ],
     );
@@ -112,7 +113,7 @@ class PdfExporter {
       final name = entry.value;
       double total = 0;
       final cells = <pw.Widget>[
-        _cell(name, regularFont, fontFallback: fontFallback)
+        _cell(name, regularFont, fontFallback: fontFallback, align: pw.TextAlign.center)
       ];
       for (final m in months) {
         final amt = lookup[m]?[name] ?? 0;
@@ -122,12 +123,12 @@ class PdfExporter {
           regularFont,
           fontFallback: fontFallback,
           align: pw.TextAlign.right,
-          fontSize: 9,
+          fontSize: 6,
           textColor: amt > 0 ? PdfColors.black : PdfColors.grey400,
         ));
       }
       cells.add(_cell(fmt.format(total), boldFont,
-          fontFallback: fontFallback, align: pw.TextAlign.right, fontSize: 9));
+          fontFallback: fontFallback, align: pw.TextAlign.right, fontSize: 6));
       return pw.TableRow(
         decoration: pw.BoxDecoration(
             color: idx.isOdd
@@ -141,19 +142,19 @@ class PdfExporter {
     final totalRow = pw.TableRow(
       decoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFFE8F1FF)),
       children: [
-        _cell('合计', boldFont, fontFallback: fontFallback),
+        _cell('合计', boldFont, fontFallback: fontFallback, align: pw.TextAlign.center),
         ...months.map((m) {
           final colTotal =
               (lookup[m]?.values ?? []).fold(0.0, (s, a) => s + a);
           return _cell(fmt.format(colTotal), boldFont,
               fontFallback: fontFallback,
-              align: pw.TextAlign.right, fontSize: 9);
+              align: pw.TextAlign.right, fontSize: 6);
         }),
         () {
           final grand = items.fold(0.0, (s, i) => s + i.amount);
           return _cell(fmt.format(grand), boldFont,
               fontFallback: fontFallback,
-              align: pw.TextAlign.right, fontSize: 9);
+              align: pw.TextAlign.right, fontSize: 6);
         }(),
       ],
     );
@@ -165,8 +166,8 @@ class PdfExporter {
     pdf.addPage(
       pw.MultiPage(
         pageTheme: pw.PageTheme(
-          pageFormat: PdfPageFormat.a4.landscape,
-          margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 20),
           theme: theme,
         ),
         // 每页顶部重复表头
@@ -179,15 +180,15 @@ class PdfExporter {
                 pw.Text(batchLabel,
                     style: pw.TextStyle(
                       font: boldFont,
-                      fontSize: 14,
+                      fontSize: 11,
                       fontFallback: fontFallback,
                     )),
                 pw.Spacer(),
                 pw.Text(
-                    '生成时间：${_nowString()}  第 ${ctx.pageNumber} 页',
+                    '生成时间：${_nowString()}',
                     style: pw.TextStyle(
                       font: regularFont,
-                      fontSize: 9,
+                      fontSize: 7,
                       color: PdfColors.grey600,
                       fontFallback: fontFallback,
                     )),
@@ -223,16 +224,16 @@ class PdfExporter {
     List<pw.Font> fontFallback = const [],
     bool isHeader = false,
     pw.TextAlign align = pw.TextAlign.left,
-    double fontSize = 10,
+    double fontSize = 7,
     PdfColor? textColor,
   }) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 4),
       child: pw.Text(
         text,
         style: pw.TextStyle(
           font: font,
-          fontSize: isHeader ? 9.5 : fontSize,
+          fontSize: isHeader ? 7.5 : fontSize,
           fontFallback: fontFallback,
           color: textColor,
         ),
@@ -257,8 +258,7 @@ class PdfExporter {
 
   static String _nowString() {
     final now = DateTime.now();
-    return '${now.year}-${_pad(now.month)}-${_pad(now.day)} '
-        '${_pad(now.hour)}:${_pad(now.minute)}';
+    return '${now.year}-${_pad(now.month)}-${_pad(now.day)}';
   }
 
   static String _pad(int n) => n.toString().padLeft(2, '0');

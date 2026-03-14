@@ -140,7 +140,9 @@ class _ReportPreview extends StatelessWidget {
                           backgroundColor: _headerBg,
                           cells: [
                             const _ReportCell('姓名',
-                                width: _colName, isHeader: true),
+                                width: _colName,
+                                isHeader: true,
+                                align: TextAlign.center),
                             ...data.months.map(
                               (month) => _ReportCell(
                                 _fmtMonthKey(month),
@@ -151,7 +153,7 @@ class _ReportPreview extends StatelessWidget {
                             ),
                             const _ReportCell('合计',
                                 width: _colTotal,
-                                align: TextAlign.right,
+                                align: TextAlign.center,
                                 isHeader: true),
                           ],
                         ),
@@ -161,7 +163,8 @@ class _ReportPreview extends StatelessWidget {
                           final name = entry.value;
                           var total = 0.0;
                           final cells = <_ReportCell>[
-                            _ReportCell(name, width: _colName),
+                            _ReportCell(name,
+                                width: _colName, align: TextAlign.center),
                           ];
                           for (final month in data.months) {
                             final amount = data.lookup[month]?[name] ?? 0.0;
@@ -194,7 +197,9 @@ class _ReportPreview extends StatelessWidget {
                           backgroundColor: _totalRowBg,
                           cells: [
                             const _ReportCell('合计',
-                                width: _colName, isStrong: true),
+                                width: _colName,
+                                isStrong: true,
+                                align: TextAlign.center),
                             ...data.months.map(
                               (month) => _ReportCell(
                                 fmt.format(data.columnTotal(month)),
@@ -226,7 +231,9 @@ class _ReportPreview extends StatelessWidget {
   String _fmtMonthKey(String key) {
     final parts = key.split('-');
     if (parts.length != 2) return key;
-    return '${int.tryParse(parts[1]) ?? parts[1]}月';
+    final y = (int.tryParse(parts[0]) ?? 0) % 100;
+    final m = int.tryParse(parts[1]) ?? 0;
+    return '${y.toString().padLeft(2, '0')}年${m.toString().padLeft(2, '0')}月';
   }
 }
 

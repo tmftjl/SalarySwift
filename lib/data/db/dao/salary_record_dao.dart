@@ -71,13 +71,14 @@ class SalaryRecordDao extends DatabaseAccessor<AppDatabase>
   /// 插入或覆盖某员工某月工资（依赖唯一约束 employeeId+year+month）
   Future<void> upsertRecord(
       int employeeId, int year, int month, double amount) async {
-    await into(salaryRecords).insertOnConflictUpdate(
+    await into(salaryRecords).insert(
       SalaryRecordsCompanion.insert(
         employeeId: employeeId,
         year: year,
         month: month,
         amount: _toCents(amount),
       ),
+      mode: InsertMode.insertOrReplace,
     );
   }
 
