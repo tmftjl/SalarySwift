@@ -5,6 +5,7 @@ import 'package:salary_swift/data/db/app_database.dart';
 import 'package:salary_swift/data/db/dao/salary_record_dao.dart';
 import 'package:salary_swift/data/repository/salary_repository.dart';
 import 'package:salary_swift/util/pdf_exporter.dart';
+import 'package:salary_swift/util/top_notification.dart';
 
 import 'salary_report_viewmodel.dart';
 
@@ -65,24 +66,14 @@ class SalaryReportDetailScreen extends ConsumerWidget {
           .getDetailForBatch(batch);
       if (items.isEmpty) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('该批次范围内暂无工资数据'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          showTopNotification(context, '该批次范围内暂无工资数据', isError: true);
         }
         return;
       }
       await PdfExporter.exportSalaryReport(batch: batch, items: items);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('导出失败：$e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showTopNotification(context, '导出失败：$e', isError: true);
       }
     }
   }

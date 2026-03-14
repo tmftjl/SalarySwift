@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:salary_swift/data/db/app_database.dart';
 import 'package:salary_swift/data/repository/batch_repository.dart';
+import 'package:salary_swift/util/top_notification.dart';
 
 import 'salary_report_detail_screen.dart';
 import 'salary_report_viewmodel.dart';
@@ -172,12 +173,7 @@ class SalaryReportScreen extends ConsumerWidget {
           .read(salaryReportViewModelProvider.notifier)
           .createBatch(startYear, startMonth, endYear, endMonth);
       if (error != null && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_batchErrorMessage(error)),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showTopNotification(context, _batchErrorMessage(error), isError: true);
       }
     }
   }
