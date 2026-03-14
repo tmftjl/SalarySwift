@@ -72,12 +72,16 @@ class PdfExporter {
 
     final colCount = 1 + months.length + 1; // 姓名 + 各月 + 合计
 
+    // 固定列宽：A4横向可用宽度786pt，12个月时共748pt，留有余量
+    const nameColW = 60.0;
+    const monthColW = 52.0;
+    const totalColW = 64.0;
     final columnWidths = <int, pw.TableColumnWidth>{
-      0: const pw.FixedColumnWidth(52),
-      colCount - 1: const pw.FixedColumnWidth(68),
+      0: const pw.FixedColumnWidth(nameColW),
+      colCount - 1: const pw.FixedColumnWidth(totalColW),
     };
     for (int i = 1; i < colCount - 1; i++) {
-      columnWidths[i] = const pw.FlexColumnWidth(1);
+      columnWidths[i] = const pw.FixedColumnWidth(monthColW);
     }
 
     // 表头行
