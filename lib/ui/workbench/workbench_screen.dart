@@ -145,8 +145,7 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
     await changeAction();
   }
 
-  Future<void> _saveAll(WorkbenchState state) async {
-    final amounts = _collectChangedAmounts(state);
+  Future<void> _saveAll(WorkbenchState state) async {    final amounts = _collectChangedAmounts(state);
     if (amounts.isEmpty) {
       return;
     }
@@ -162,6 +161,72 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
     );
   }
 
+  Future<void> _handlePickMonth(WorkbenchState state) async {
+    if (state.isLoading || state.isSaving) return;
+
+    if (_hasPendingChanges(state)) {
+      final shouldDiscard = await _confirmDiscardChanges();
+      if (!shouldDiscard || !mounted) return;
+    }
+
+    final now = DateTime.now();
+    final years = List.generate(11, (i) => now.year - 5 + i);
+    int pickedYear = state.selectedYear;
+    int pickedMonth = state.selectedMonth;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          title: const Text('选择年月'),
+          content: Row(
+            children: [
+              Expanded(
+                child: _YMDropdown(
+                  label: '年',
+                  value: pickedYear,
+                  items: years,
+                  onChanged: (v) => setS(() => pickedYear = v),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _YMDropdown(
+                  label: '月',
+                  value: pickedMonth,
+                  items: List.generate(12, (i) => i + 1),
+                  onChanged: (v) => setS(() => pickedMonth = v),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6))),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      FocusScope.of(context).unfocus();
+      await ref
+          .read(workbenchViewModelProvider.notifier)
+          .changeMonth(pickedYear, pickedMonth);
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workbenchViewModelProvider);
@@ -174,6 +239,7 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        title: const Text('工作台'),
         actions: [
           TextButton(
             onPressed: state.isLoading || state.isSaving || !hasPendingChanges
@@ -208,15 +274,16 @@ class _WorkbenchScreenState extends ConsumerState<WorkbenchScreen> {
                     state,
                     () => ref.read(workbenchViewModelProvider.notifier).nextMonth(),
                   ),
+                  onPickMonth: () => _handlePickMonth(state),
                 ),
                 Expanded(
                   child: state.employees.isEmpty
                       ? _EmptyEmployee()
                       : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                           itemCount: state.employees.length,
                           separatorBuilder: (_, __) =>
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 8),
                           itemBuilder: (_, i) {
                             final emp = state.employees[i];
                             final saved = state.savedAmounts[emp.id] ?? 0.0;
@@ -267,6 +334,7 @@ class _MonthSelector extends StatelessWidget {
     required this.canChangeMonth,
     required this.onPrev,
     required this.onNext,
+    required this.onPickMonth,
   });
 
   final int year;
@@ -277,28 +345,25 @@ class _MonthSelector extends StatelessWidget {
   final bool canChangeMonth;
   final VoidCallback onPrev;
   final VoidCallback onNext;
+  final VoidCallback onPickMonth;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            const Color(0xFF5C6BC0)
-          ],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color:
-                Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: const Color(0xFF1565C0).withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -312,22 +377,40 @@ class _MonthSelector extends StatelessWidget {
                 onPressed: canChangeMonth ? onPrev : null,
                 icon: const Icon(Icons.chevron_left, color: Colors.white),
                 visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
-              Text(
-                '$year年$month月',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold),
+              GestureDetector(
+                onTap: canChangeMonth ? onPickMonth : null,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$year年$month月',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.expand_more,
+                      color: Colors.white.withValues(alpha: 0.8),
+                      size: 18,
+                    ),
+                  ],
+                ),
               ),
               IconButton(
                 onPressed: canChangeMonth ? onNext : null,
                 icon: const Icon(Icons.chevron_right, color: Colors.white),
                 visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           // 总额
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -336,27 +419,27 @@ class _MonthSelector extends StatelessWidget {
               Text(
                 hasPendingChanges ? '待保存合计  ¥ ' : '本月合计  ¥ ',
                 style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8), fontSize: 13),
+                    color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
               ),
               Text(
                 fmt.format(total),
                 style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.5),
               ),
             ],
           ),
           if (hasPendingChanges) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 '已修改，点击右上角保存后写入数据库',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.82),
-                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.78),
+                  fontSize: 11,
                 ),
               ),
             ),
@@ -395,42 +478,51 @@ class _EmployeeInputTile extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isDirty
-              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.35)
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.4)
               : isSaved
-                  ? Colors.green.withValues(alpha: 0.3)
-                  : Colors.grey.withValues(alpha: 0.12),
+                  ? const Color(0xFF43A047).withValues(alpha: 0.3)
+                  : const Color(0xFFDDE3EE),
+          width: isDirty ? 1.2 : 1,
         ),
       ),
       child: ListTile(
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: isSaved
-            ? Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                    color: Colors.green, shape: BoxShape.circle),
-              )
-            : null,
-        title: Text(employee.name,
-            style:
-                const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-        subtitle: savedLabel != null
-            ? Text(
-                isDirty ? '原值: $savedLabel' : '已存: $savedLabel',
-                style: TextStyle(
-                  fontSize: 12,
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+        leading: null,
+        title: Row(
+          children: [
+            if (isSaved) ...[
+              Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.only(right: 7),
+                decoration: BoxDecoration(
                   color: isDirty
                       ? Theme.of(context).colorScheme.primary
-                      : Colors.green,
+                      : const Color(0xFF43A047),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+            Text(employee.name,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 15)),
+          ],
+        ),
+        subtitle: savedLabel != null
+            ? Text(
+                '已存: $savedLabel',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF43A047),
                 ),
               )
             : null,
         trailing: SizedBox(
-          width: 140,
+          width: 130,
           child: TextField(
             controller: controller,
             focusNode: focusNode,
@@ -445,22 +537,22 @@ class _EmployeeInputTile extends StatelessWidget {
             onSubmitted: (_) => onSubmitted(),
             style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF2D3436),
-                fontSize: 18),
+                color: Color(0xFF1A2340),
+                fontSize: 17),
             decoration: InputDecoration(
               hintText: '0.00',
               prefixText: '¥ ',
               prefixStyle:
-                  const TextStyle(fontSize: 14, color: Colors.grey),
+                  const TextStyle(fontSize: 13, color: Color(0xFF9BA3B2)),
               filled: true,
-              fillColor: Colors.grey.withValues(alpha: 0.05),
+              fillColor: const Color(0xFFF4F7FB),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(6),
                 borderSide: BorderSide.none,
               ),
               isDense: true,
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             ),
           ),
         ),
@@ -476,12 +568,52 @@ class _EmptyEmployee extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.people_outline, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
+          Icon(Icons.people_outline, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
           Text('请先在员工库添加员工',
               style:
-                  TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+                  TextStyle(color: Colors.grey.shade500, fontSize: 15)),
         ],
+      ),
+    );
+  }
+}
+
+class _YMDropdown extends StatelessWidget {
+  const _YMDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final List<int> items;
+  final void Function(int) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: value,
+          isDense: true,
+          isExpanded: true,
+          items: items
+              .map((v) => DropdownMenuItem(value: v, child: Text('$v')))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
       ),
     );
   }

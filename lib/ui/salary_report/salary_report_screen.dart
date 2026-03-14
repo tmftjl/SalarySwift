@@ -12,7 +12,7 @@ class SalaryReportScreen extends ConsumerWidget {
   String _batchLabel(SalaryBatch batch) {
     final start = '${batch.startYear}年${batch.startMonth}月';
     final end = '${batch.endYear}年${batch.endMonth}月';
-    return start == end ? start : '$start ~ $end';
+    return start == end ? start : '$start - $end';
   }
 
   String _batchErrorMessage(BatchCreationError error) {
@@ -37,12 +37,14 @@ class SalaryReportScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
           title: const Text('新建结算批次'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('开始月份',
-                  style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  style: TextStyle(color: Colors.grey, fontSize: 12)),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -65,9 +67,9 @@ class SalaryReportScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               const Text('结束月份',
-                  style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  style: TextStyle(color: Colors.grey, fontSize: 12)),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -99,6 +101,9 @@ class SalaryReportScreen extends ConsumerWidget {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6))),
               child: const Text('创建'),
             ),
           ],
@@ -129,6 +134,8 @@ class SalaryReportScreen extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10)),
         title: const Text('删除批次？'),
         content: const Text('仅删除批次记录，不影响工资数据。'),
         actions: [
@@ -145,7 +152,9 @@ class SalaryReportScreen extends ConsumerWidget {
     );
 
     if (ok == true && context.mounted) {
-      await ref.read(salaryReportViewModelProvider.notifier).deleteBatch(batch.id);
+      await ref
+          .read(salaryReportViewModelProvider.notifier)
+          .deleteBatch(batch.id);
     }
   }
 
@@ -154,15 +163,15 @@ class SalaryReportScreen extends ConsumerWidget {
     final state = ref.watch(salaryReportViewModelProvider);
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(title: const Text('工资报表')),
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.batches.isEmpty
               ? _EmptyReport()
               : ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: state.batches.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final batch = state.batches[i];
                     return _BatchCard(
@@ -183,6 +192,7 @@ class SalaryReportScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateBatchDialog(context, ref),
         tooltip: '新建结算批次',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: const Icon(Icons.add),
       ),
     );
@@ -202,57 +212,53 @@ class _BatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(8),
+        border: const Border.fromBorderSide(
+            BorderSide(color: Color(0xFFE8EEF8), width: 1)),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
+                    color: primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.receipt_long_outlined,
-                      color: Theme.of(context).colorScheme.primary),
+                      color: primary, size: 20),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Text(
                     label,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 15,
                     ),
                   ),
                 ),
                 IconButton(
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline,
-                      color: Colors.redAccent, size: 20),
+                      color: Colors.redAccent, size: 18),
                   tooltip: '删除批次',
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.grey),
+                const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
               ],
             ),
           ),
@@ -270,13 +276,13 @@ class _EmptyReport extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.receipt_long_outlined,
-              size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
+              size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
           Text('暂无结算批次',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
-          const SizedBox(height: 8),
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 15)),
+          const SizedBox(height: 6),
           Text('点击右下角 + 新建结算批次',
-              style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
         ],
       ),
     );
@@ -302,7 +308,7 @@ class _YearMonthDropdown extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         isDense: true,
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       ),

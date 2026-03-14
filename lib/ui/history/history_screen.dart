@@ -13,15 +13,15 @@ class HistoryScreen extends ConsumerWidget {
     final fmt = NumberFormat('#,##0.00', 'zh_CN');
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(title: const Text('历史工资')),
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.months.isEmpty
               ? _EmptyHistory()
               : ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: state.months.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final m = state.months[i];
                     return _MonthCard(
@@ -57,48 +57,42 @@ class _MonthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
-        ],
+        borderRadius: BorderRadius.circular(8),
+        border: const Border.fromBorderSide(
+            BorderSide(color: Color(0xFFE8EEF8), width: 1)),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16)),
+                    color: primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8)),
                 child: Icon(Icons.calendar_today_outlined,
-                    color: Theme.of(context).colorScheme.primary),
+                    color: primary, size: 20),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title,
                         style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 18)),
-                    const SizedBox(height: 4),
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 2),
                     Text('$count 人',
                         style: TextStyle(
-                            color: Colors.grey.shade500, fontSize: 13)),
+                            color: Colors.grey.shade500, fontSize: 12)),
                   ],
                 ),
               ),
@@ -108,11 +102,11 @@ class _MonthCard extends StatelessWidget {
                   Text('¥ $amount',
                       style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Color(0xFF2D3436))),
-                  const SizedBox(height: 4),
+                          fontSize: 15,
+                          color: Color(0xFF1A2340))),
+                  const SizedBox(height: 2),
                   const Icon(Icons.chevron_right,
-                      size: 20, color: Colors.grey),
+                      size: 18, color: Colors.grey),
                 ],
               ),
             ],
@@ -131,11 +125,10 @@ class _EmptyHistory extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.history_edu_outlined,
-              size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
+              size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
           Text('暂无工资记录',
-              style:
-                  TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 15)),
         ],
       ),
     );

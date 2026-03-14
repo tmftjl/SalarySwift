@@ -22,9 +22,9 @@ class PdfExporter {
     final bytes = await pdf.save();
 
     final label =
-        '${batch.startYear}${_pad(batch.startMonth)}-${batch.endYear}${_pad(batch.endMonth)}';
+        '工资${batch.startYear}${_pad(batch.startMonth)}-${batch.endYear}${_pad(batch.endMonth)}';
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/salary_report_$label.pdf');
+    final file = File('${dir.path}/$label.pdf');
     await file.writeAsBytes(bytes);
 
     await Share.shareXFiles(
@@ -73,8 +73,8 @@ class PdfExporter {
     final colCount = 1 + months.length + 1; // 姓名 + 各月 + 合计
 
     final columnWidths = <int, pw.TableColumnWidth>{
-      0: const pw.FixedColumnWidth(56),
-      colCount - 1: const pw.FixedColumnWidth(64),
+      0: const pw.FixedColumnWidth(52),
+      colCount - 1: const pw.FixedColumnWidth(68),
     };
     for (int i = 1; i < colCount - 1; i++) {
       columnWidths[i] = const pw.FlexColumnWidth(1);
@@ -82,17 +82,30 @@ class PdfExporter {
 
     // 表头行
     final headerRow = pw.TableRow(
-      decoration: const pw.BoxDecoration(color: PdfColors.blueGrey100),
+      decoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFF1565C0)),
       children: [
-        _cell('姓名', boldFont, fontFallback: fontFallback, isHeader: true),
+        _cell('姓名', boldFont,
+            fontFallback: fontFallback,
+            isHeader: true,
+            textColor: PdfColors.white),
         ...months.map((m) => _cell(_fmtMonthKey(m), boldFont,
-            fontFallback: fontFallback, isHeader: true, fontSize: 9)),
-        _cell('合计', boldFont, fontFallback: fontFallback, isHeader: true),
+            fontFallback: fontFallback,
+            isHeader: true,
+            fontSize: 9,
+            align: pw.TextAlign.center,
+            textColor: PdfColors.white)),
+        _cell('合计', boldFont,
+            fontFallback: fontFallback,
+            isHeader: true,
+            align: pw.TextAlign.right,
+            textColor: PdfColors.white),
       ],
     );
 
     // 数据行
-    final dataRows = employeeNames.map((name) {
+    final dataRows = employeeNames.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final name = entry.value;
       double total = 0;
       final cells = <pw.Widget>[
         _cell(name, regularFont, fontFallback: fontFallback)
@@ -101,22 +114,28 @@ class PdfExporter {
         final amt = lookup[m]?[name] ?? 0;
         total += amt;
         cells.add(_cell(
-          amt > 0 ? fmt.format(amt) : '-',
+          amt > 0 ? fmt.format(amt) : '–',
           regularFont,
           fontFallback: fontFallback,
           align: pw.TextAlign.right,
           fontSize: 9,
+          textColor: amt > 0 ? PdfColors.black : PdfColors.grey400,
         ));
       }
       cells.add(_cell(fmt.format(total), boldFont,
-          fontFallback: fontFallback,
-          align: pw.TextAlign.right, fontSize: 9));
-      return pw.TableRow(children: cells);
+          fontFallback: fontFallback, align: pw.TextAlign.right, fontSize: 9));
+      return pw.TableRow(
+        decoration: pw.BoxDecoration(
+            color: idx.isOdd
+                ? PdfColor.fromInt(0xFFF7FAFF)
+                : PdfColors.white),
+        children: cells,
+      );
     }).toList();
 
     // 合计行
     final totalRow = pw.TableRow(
-      decoration: const pw.BoxDecoration(color: PdfColors.blueGrey50),
+      decoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFFE8F1FF)),
       children: [
         _cell('合计', boldFont, fontFallback: fontFallback),
         ...months.map((m) {
@@ -141,41 +160,37 @@ class PdfExporter {
       pw.Page(
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4.landscape,
-          margin: const pw.EdgeInsets.all(32),
+          margin: const pw.EdgeInsets.symmetric(horizontal: 28, vertical: 24),
           theme: theme,
         ),
         build: (ctx) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text('工资汇总表  $batchLabel',
-                style: pw.TextStyle(
-                  font: boldFont,
-                  fontSize: 16,
-                  fontFallback: fontFallback,
-                )),
-            pw.SizedBox(height: 4),
-            pw.Text('生成时间：${_nowString()}',
-                style: pw.TextStyle(
-                  font: regularFont,
-                  fontSize: 10,
-                  color: PdfColors.grey600,
-                  fontFallback: fontFallback,
-                )),
-            pw.SizedBox(height: 14),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                pw.Text(batchLabel,
+                    style: pw.TextStyle(
+                      font: boldFont,
+                      fontSize: 14,
+                      fontFallback: fontFallback,
+                    )),
+                pw.Spacer(),
+                pw.Text('生成时间：${_nowString()}',
+                    style: pw.TextStyle(
+                      font: regularFont,
+                      fontSize: 9,
+                      color: PdfColors.grey600,
+                      fontFallback: fontFallback,
+                    )),
+              ],
+            ),
+            pw.SizedBox(height: 10),
             pw.Table(
-              border: pw.TableBorder.all(color: PdfColors.grey300),
+              border: pw.TableBorder.all(
+                  color: PdfColor.fromInt(0xFFCDD8F0), width: 0.6),
               columnWidths: columnWidths,
               children: [headerRow, ...dataRows, totalRow],
-            ),
-            pw.SizedBox(height: 14),
-            pw.Text(
-              '共 ${employeeNames.length} 人  ${months.length} 个月',
-              style: pw.TextStyle(
-                font: regularFont,
-                fontSize: 10,
-                color: PdfColors.grey600,
-                fontFallback: fontFallback,
-              ),
             ),
           ],
         ),
@@ -194,6 +209,7 @@ class PdfExporter {
     bool isHeader = false,
     pw.TextAlign align = pw.TextAlign.left,
     double fontSize = 10,
+    PdfColor? textColor,
   }) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
@@ -201,8 +217,9 @@ class PdfExporter {
         text,
         style: pw.TextStyle(
           font: font,
-          fontSize: isHeader ? 10 : fontSize,
+          fontSize: isHeader ? 9.5 : fontSize,
           fontFallback: fontFallback,
+          color: textColor,
         ),
         textAlign: align,
       ),
@@ -212,13 +229,15 @@ class PdfExporter {
   static String _batchLabel(SalaryBatch batch) {
     final start = '${batch.startYear}年${batch.startMonth}月';
     final end = '${batch.endYear}年${batch.endMonth}月';
-    return start == end ? start : '$start ~ $end';
+    return start == end ? start : '$start - $end';
   }
 
   static String _fmtMonthKey(String key) {
     final parts = key.split('-');
     if (parts.length != 2) return key;
-    return '${parts[0]}年\n${int.tryParse(parts[1]) ?? parts[1]}月';
+    final y = (int.tryParse(parts[0]) ?? 0) % 100;
+    final m = int.tryParse(parts[1]) ?? 0;
+    return '${_pad(y)}年${_pad(m)}月';
   }
 
   static String _nowString() {

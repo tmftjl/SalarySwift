@@ -23,12 +23,19 @@ class SalaryReportDetailScreen extends ConsumerWidget {
 
   final SalaryBatch batch;
 
+  String _batchLabel(SalaryBatch b) {
+    final start = '${b.startYear}年${b.startMonth}月';
+    final end = '${b.endYear}年${b.endMonth}月';
+    return start == end ? start : '$start - $end';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailAsync = ref.watch(_batchDetailProvider(batch));
 
     return Scaffold(
       appBar: AppBar(
+        title: Text(_batchLabel(batch)),
         actions: [
           IconButton(
             onPressed: () => _exportBatch(context, ref),
@@ -79,12 +86,6 @@ class SalaryReportDetailScreen extends ConsumerWidget {
       }
     }
   }
-
-  String _batchLabel(SalaryBatch batch) {
-    final start = '${batch.startYear}年${batch.startMonth}月';
-    final end = '${batch.endYear}年${batch.endMonth}月';
-    return start == end ? start : '$start ~ $end';
-  }
 }
 
 class _ReportPreview extends StatelessWidget {
@@ -96,153 +97,136 @@ class _ReportPreview extends StatelessWidget {
   final SalaryBatch batch;
   final List<SalaryDetailItem> items;
 
+  static const _colName = 100.0;
+  static const _colMonth = 105.0;
+  static const _colTotal = 110.0;
+
+  static const _headerBg = Color(0xFF1565C0);
+  static const _totalRowBg = Color(0xFFE8F1FF);
+  static const _borderColor = Color(0xFFCDD8F0);
+  static const _altRowBg = Color(0xFFF7FAFF);
+
   @override
   Widget build(BuildContext context) {
     final data = _ReportMatrix.fromItems(items);
     final fmt = NumberFormat('#,##0.00', 'zh_CN');
-    final tableWidth = 120.0 + data.months.length * 110.0 + 120.0;
+    final tableWidth =
+        _colName + data.months.length * _colMonth + _colTotal;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '工资汇总表  ${_batchLabel(batch)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '共 ${data.employeeNames.length} 人  ${data.months.length} 个月',
-                    style:
-                        TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                  ),
-                ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 表格
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border:
+                    const Border.fromBorderSide(BorderSide(color: _borderColor)),
               ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(bottom: Radius.circular(24)),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: tableWidth,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          _ReportRow(
-                            backgroundColor: const Color(0xFFECEFF6),
-                            cells: [
-                              const _ReportCell('姓名',
-                                  width: 120, isHeader: true),
-                              ...data.months.map(
-                                (month) => _ReportCell(
-                                  _fmtMonthKey(month),
-                                  width: 110,
-                                  isHeader: true,
-                                ),
+              clipBehavior: Clip.antiAlias,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: tableWidth,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // 表头
+                        _ReportRow(
+                          backgroundColor: _headerBg,
+                          cells: [
+                            const _ReportCell('姓名',
+                                width: _colName, isHeader: true),
+                            ...data.months.map(
+                              (month) => _ReportCell(
+                                _fmtMonthKey(month),
+                                width: _colMonth,
+                                isHeader: true,
+                                align: TextAlign.center,
                               ),
-                              const _ReportCell('合计',
-                                  width: 120,
-                                  align: TextAlign.right,
-                                  isHeader: true),
-                            ],
-                          ),
-                          ...data.employeeNames.map((name) {
-                            var total = 0.0;
-                            final cells = <_ReportCell>[
-                              _ReportCell(name, width: 120),
-                            ];
-                            for (final month in data.months) {
-                              final amount = data.lookup[month]?[name] ?? 0.0;
-                              total += amount;
-                              cells.add(
-                                _ReportCell(
-                                  amount > 0 ? fmt.format(amount) : '-',
-                                  width: 110,
-                                  align: TextAlign.right,
-                                ),
-                              );
-                            }
+                            ),
+                            const _ReportCell('合计',
+                                width: _colTotal,
+                                align: TextAlign.right,
+                                isHeader: true),
+                          ],
+                        ),
+                        // 数据行
+                        ...data.employeeNames.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final name = entry.value;
+                          var total = 0.0;
+                          final cells = <_ReportCell>[
+                            _ReportCell(name, width: _colName),
+                          ];
+                          for (final month in data.months) {
+                            final amount = data.lookup[month]?[name] ?? 0.0;
+                            total += amount;
                             cells.add(
                               _ReportCell(
-                                fmt.format(total),
-                                width: 120,
+                                amount > 0 ? fmt.format(amount) : '–',
+                                width: _colMonth,
                                 align: TextAlign.right,
-                                isStrong: true,
+                                dimmed: amount == 0,
                               ),
                             );
-                            return _ReportRow(cells: cells);
-                          }),
-                          _ReportRow(
-                            backgroundColor: const Color(0xFFF5F7FA),
-                            cells: [
-                              const _ReportCell('合计',
-                                  width: 120, isStrong: true),
-                              ...data.months.map(
-                                (month) => _ReportCell(
-                                  fmt.format(data.columnTotal(month)),
-                                  width: 110,
-                                  align: TextAlign.right,
-                                  isStrong: true,
-                                ),
-                              ),
-                              _ReportCell(
-                                fmt.format(data.grandTotal),
-                                width: 120,
+                          }
+                          cells.add(
+                            _ReportCell(
+                              fmt.format(total),
+                              width: _colTotal,
+                              align: TextAlign.right,
+                              isStrong: true,
+                            ),
+                          );
+                          return _ReportRow(
+                            backgroundColor:
+                                idx.isOdd ? _altRowBg : Colors.white,
+                            cells: cells,
+                          );
+                        }),
+                        // 合计行
+                        _ReportRow(
+                          backgroundColor: _totalRowBg,
+                          cells: [
+                            const _ReportCell('合计',
+                                width: _colName, isStrong: true),
+                            ...data.months.map(
+                              (month) => _ReportCell(
+                                fmt.format(data.columnTotal(month)),
+                                width: _colMonth,
                                 align: TextAlign.right,
                                 isStrong: true,
                               ),
-                            ],
-                          ),
-                        ],
-                      ),
+                            ),
+                            _ReportCell(
+                              fmt.format(data.grandTotal),
+                              width: _colTotal,
+                              align: TextAlign.right,
+                              isStrong: true,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
-  }
-
-  String _batchLabel(SalaryBatch batch) {
-    final start = '${batch.startYear}年${batch.startMonth}月';
-    final end = '${batch.endYear}年${batch.endMonth}月';
-    return start == end ? start : '$start ~ $end';
   }
 
   String _fmtMonthKey(String key) {
     final parts = key.split('-');
-    if (parts.length != 2) {
-      return key;
-    }
-    return '${parts[0]}年 ${int.tryParse(parts[1]) ?? parts[1]}月';
+    if (parts.length != 2) return key;
+    return '${int.tryParse(parts[1]) ?? parts[1]}月';
   }
 }
 
@@ -271,6 +255,7 @@ class _ReportCell extends StatelessWidget {
     this.align = TextAlign.left,
     this.isHeader = false,
     this.isStrong = false,
+    this.dimmed = false,
   });
 
   final String text;
@@ -278,32 +263,40 @@ class _ReportCell extends StatelessWidget {
   final TextAlign align;
   final bool isHeader;
   final bool isStrong;
+  final bool dimmed;
+
+  static const _border = BorderSide(color: Color(0xFFCDD8F0), width: 0.8);
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = Colors.grey.shade300;
     return Container(
       width: width,
-      constraints: const BoxConstraints(minHeight: 46),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
+      constraints: const BoxConstraints(minHeight: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: const BoxDecoration(
         border: Border(
-          left: BorderSide(color: borderColor),
-          top: BorderSide(color: borderColor),
-          right: BorderSide(color: borderColor),
-          bottom: BorderSide(color: borderColor),
+          right: _border,
+          bottom: _border,
         ),
       ),
-      alignment:
-          align == TextAlign.right ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: align == TextAlign.right
+          ? Alignment.centerRight
+          : align == TextAlign.center
+              ? Alignment.center
+              : Alignment.centerLeft,
       child: Text(
         text,
         textAlign: align,
         style: TextStyle(
-          fontSize: isHeader ? 13 : 12,
-          fontWeight:
-              isHeader || isStrong ? FontWeight.w700 : FontWeight.w500,
-          color: const Color(0xFF2D3436),
+          fontSize: isHeader ? 12 : 12,
+          fontWeight: isHeader || isStrong ? FontWeight.w700 : FontWeight.w400,
+          color: isHeader
+              ? Colors.white
+              : dimmed
+                  ? const Color(0xFFBBC5D6)
+                  : isStrong
+                      ? const Color(0xFF1A2340)
+                      : const Color(0xFF3A4560),
         ),
       ),
     );
@@ -329,12 +322,14 @@ class _ReportMatrix {
     final lookup = <String, Map<String, double>>{};
 
     for (final item in items) {
-      final monthKey = '${item.year}-${item.month.toString().padLeft(2, '0')}';
+      final monthKey =
+          '${item.year}-${item.month.toString().padLeft(2, '0')}';
       monthKeys.add(monthKey);
       if (!employeeNames.contains(item.employeeName)) {
         employeeNames.add(item.employeeName);
       }
-      lookup.putIfAbsent(monthKey, () => <String, double>{})[item.employeeName] =
+      lookup.putIfAbsent(
+              monthKey, () => <String, double>{})[item.employeeName] =
           item.amount;
     }
 
@@ -362,10 +357,10 @@ class _EmptyBatchData extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.table_chart_outlined,
-              size: 72, color: Colors.grey.shade300),
+              size: 64, color: Colors.grey.shade300),
           const SizedBox(height: 12),
           Text('该批次范围内暂无工资数据',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 15)),
         ],
       ),
     );
